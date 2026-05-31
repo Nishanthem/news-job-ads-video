@@ -1,0 +1,10 @@
+target/
+*.class
+*.mp4
+*.png
+!docs/**/*.png
+.idea/
+*.iml
+.vscode/
+.DS_Store
+dependency-reduced-pom.xml

@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Example Job Board",
+    "url": "https://example-job-board.com/listings",
+    "itemSelector": "div.job-card",
+    "titleSelector": "h2.job-title",
+    "companySelector": ".company-name",
+    "locationSelector": ".job-location",
+    "linkSelector": "a"
+  }
+]

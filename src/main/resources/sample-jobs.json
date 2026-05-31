@@ -1,0 +1,52 @@
+[
+  {
+    "title": "Staff Nurse (10 posts)",
+    "company": "City General Hospital",
+    "location": "Hyderabad, Telangana",
+    "qualification": "B.Sc Nursing / GNM, registered with State Nursing Council",
+    "salary": "Rs. 25,000 - 35,000 / month",
+    "contact": "careers@citygeneral.example, 040-1234567",
+    "lastDate": "15 June 2026",
+    "source": "Sample Newspaper Classifieds"
+  },
+  {
+    "title": "Primary School Teachers (TGT/PGT)",
+    "company": "Vidya Public School",
+    "location": "Vijayawada, Andhra Pradesh",
+    "qualification": "B.Ed with relevant graduation; D.El.Ed for primary",
+    "salary": "As per school norms",
+    "contact": "Walk-in interview, bring resume + certificates",
+    "lastDate": "10 June 2026",
+    "source": "Sample Newspaper Classifieds"
+  },
+  {
+    "title": "Accountant cum Office Assistant",
+    "company": "Sri Lakshmi Traders",
+    "location": "Chennai, Tamil Nadu",
+    "qualification": "B.Com with Tally & GST knowledge, 2+ years experience",
+    "salary": "Rs. 20,000 / month negotiable",
+    "contact": "9876543210 (WhatsApp resume)",
+    "lastDate": "20 June 2026",
+    "source": "Sample Newspaper Classifieds"
+  },
+  {
+    "title": "Field Sales Executive",
+    "company": "AquaPure Solutions",
+    "location": "Bengaluru, Karnataka",
+    "qualification": "Any graduate, two-wheeler with licence preferred",
+    "salary": "Rs. 18,000 + incentives",
+    "contact": "hr@aquapure.example",
+    "lastDate": "Open until filled",
+    "source": "Sample Newspaper Classifieds"
+  },
+  {
+    "title": "ITI Electrician / Fitter (Apprentice)",
+    "company": "Bharat Manufacturing Ltd",
+    "location": "Pune, Maharashtra",
+    "qualification": "ITI in Electrician / Fitter trade, freshers welcome",
+    "salary": "Stipend Rs. 12,000 / month",
+    "contact": "Apply online at careers.bharatmfg.example",
+    "lastDate": "30 June 2026",
+    "source": "Sample Newspaper Classifieds"
+  }
+]
