@@ -25,6 +25,11 @@ class PipelineTest {
         JobPosting noise = new JobPosting();
         noise.setTitle("Subscribe to our newsletter");
         assertFalse(filter.isJobAd(noise), "should drop noise");
+
+        JobPosting boardListing = new JobPosting();
+        boardListing.setTitle("Senior Python Developer");
+        boardListing.setCompany("Payne, Roberts and Davis");
+        assertTrue(filter.isJobAd(boardListing), "should keep structured job-board listing");
     }
 
     @Test

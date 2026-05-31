@@ -14,16 +14,37 @@ scrape (or load sample)  ->  filter job ads  ->  render one slide per job (Java2
 
 ## Example output
 
-A generated job slide and intro card:
+A generated job slide and intro card (shown in the video):
 
 ![Sample job slide](docs/sample-slide.png)
 ![Sample intro card](docs/sample-intro.png)
+
+## Proof-of-source evidence (authenticity)
+
+The video only ever shows our own re-rendered slides. But for **trust**, when scraping real sites the
+app also saves a separate `evidence/` archive so you can prove where each ad came from if anyone
+questions it. For every ad it captures:
+
+- a **screenshot of the actual ad** as it appears on the source page (via headless Chrome),
+- the **original ad image** when the listing is itself an image (e.g. e-paper clippings),
+- a full-page screenshot of the source page for context, and
+- a **`manifest.json`** recording the source name, page URL, ad link and a capture **timestamp**.
+
+Example captured ad screenshot:
+
+![Sample evidence ad](docs/sample-evidence-ad.png)
+
+This archive is **not** included in the video — it is your proof, kept on the side.
 
 ## Requirements
 
 - Java 17+
 - Maven 3.6+
 - `ffmpeg` on your `PATH` (used to build the video)
+- **Google Chrome / Chromium** installed (only needed for evidence capture when scraping real sites;
+  not needed for `--sample`). The matching `chromedriver` is fetched automatically by Selenium
+  Manager. If Chrome is in a non-standard location, set `CHROME_BINARY=/path/to/chrome` (or
+  `-Dchrome.binary=...`).
 
 On Ubuntu/Debian: `sudo apt-get install -y maven ffmpeg`
 
@@ -85,6 +106,8 @@ the element/class that wraps each listing.
 | `--seconds <n>` | `5` | Seconds each slide is shown |
 | `--fps <n>` | `25` | Video frame rate |
 | `--limit <n>` | none | Cap the number of jobs |
+| `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
+| `--no-evidence` | off | Skip capturing evidence screenshots |
 
 ## Project layout
 
@@ -95,8 +118,10 @@ src/main/java/com/jobads/
   scraper/JobScraper.java   # jsoup-based scraping
   scraper/SiteConfig.java   # per-site selector config
   filter/JobFilter.java     # keep job ads, drop noise
+  scraper/EvidenceCapture.java # screenshot the real ads as proof (headless Chrome)
   image/SlideGenerator.java # render a clean slide per job (Java2D)
   video/VideoBuilder.java   # combine slides into mp4 via ffmpeg
+  model/EvidenceItem.java   # one manifest entry of captured proof
 ```
 
 ## Legal / ethical note
@@ -113,4 +138,5 @@ Because the job is a periodic batch (e.g. produce one video per day), the simple
 - **ECS Fargate scheduled task** running the Docker image; or
 - **Elastic Beanstalk** if you later wrap it in a web service.
 
-`ffmpeg` must be available in the runtime (e.g. a Lambda layer or baked into the container image).
+`ffmpeg` (and Chrome/Chromium, if you want evidence capture) must be available in the runtime — e.g.
+as Lambda layers or baked into the container image.

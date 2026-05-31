@@ -23,10 +23,18 @@ public class JobFilter {
             "terms of service", "newsletter"
     };
 
-    /** Keep an ad if it contains a job keyword and no obvious noise keyword. */
+    /**
+     * Keep an ad when it has no obvious noise keyword AND either:
+     * <ul>
+     *   <li>it contains a job keyword (typical of newspaper classifieds like "wanted"/"vacancy"), or</li>
+     *   <li>it is a well-structured listing with both a title and a company (typical of job boards).</li>
+     * </ul>
+     */
     public boolean isJobAd(JobPosting job) {
-        String haystack = (safe(job.getTitle()) + " " + safe(job.getCompany()) + " "
-                + safe(job.getLocation())).toLowerCase(Locale.ROOT);
+        String title = safe(job.getTitle());
+        String company = safe(job.getCompany());
+        String haystack = (title + " " + company + " " + safe(job.getLocation()))
+                .toLowerCase(Locale.ROOT);
 
         for (String noise : NOISE_KEYWORDS) {
             if (haystack.contains(noise)) {
@@ -38,7 +46,8 @@ public class JobFilter {
                 return true;
             }
         }
-        return false;
+        // Structured listing: a real job entry usually pairs a title with a company name.
+        return !title.isBlank() && !company.isBlank();
     }
 
     /** Return only the items that look like job ads. */
