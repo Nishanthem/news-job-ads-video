@@ -30,6 +30,18 @@ public class SiteConfig {
     /** CSS selector (relative to the item) for the link. Optional. */
     private String linkSelector;
 
+    /** CSS selector (relative to the item) for the qualification. Optional. */
+    private String qualificationSelector;
+
+    /** CSS selector (relative to the item) for the salary. Optional. */
+    private String salarySelector;
+
+    /** CSS selector (relative to the item) for the contact. Optional. */
+    private String contactSelector;
+
+    /** CSS selector (relative to the item) for the last/closing date. Optional. */
+    private String lastDateSelector;
+
     public String getName() {
         return name;
     }
@@ -84,5 +96,37 @@ public class SiteConfig {
 
     public void setLinkSelector(String linkSelector) {
         this.linkSelector = linkSelector;
+    }
+
+    public String getQualificationSelector() {
+        return qualificationSelector;
+    }
+
+    public void setQualificationSelector(String qualificationSelector) {
+        this.qualificationSelector = qualificationSelector;
+    }
+
+    public String getSalarySelector() {
+        return salarySelector;
+    }
+
+    public void setSalarySelector(String salarySelector) {
+        this.salarySelector = salarySelector;
+    }
+
+    public String getContactSelector() {
+        return contactSelector;
+    }
+
+    public void setContactSelector(String contactSelector) {
+        this.contactSelector = contactSelector;
+    }
+
+    public String getLastDateSelector() {
+        return lastDateSelector;
+    }
+
+    public void setLastDateSelector(String lastDateSelector) {
+        this.lastDateSelector = lastDateSelector;
     }
 }

@@ -1,11 +1,19 @@
 [
   {
-    "name": "Fake Python Jobs (scraping practice site)",
-    "url": "https://realpython.github.io/fake-jobs/",
-    "itemSelector": "div.card-content",
-    "titleSelector": "h2.title",
-    "companySelector": "h3.company",
-    "locationSelector": "p.location",
-    "linkSelector": "a"
+    "name": "Employment News (employmentnews.gov.in)",
+    "url": "https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All",
+    "itemSelector": "tr:has(span[id*=RepDetails_Label4_])",
+    "titleSelector": "span[id*=RepDetails_Label4_]",
+    "companySelector": "span[id*=RepDetails_Label3_]",
+    "lastDateSelector": "span[id*=RepDetails_Label6_]"
+  },
+  {
+    "name": "Times Ascent (Times of India jobs)",
+    "url": "https://timesascent.com/jobs",
+    "itemSelector": "[class*=rounded-lg][class*=shadow-sm][class*=flex-1]",
+    "titleSelector": "h3[class*=text-title]",
+    "companySelector": "p[class*=text-small]",
+    "locationSelector": "div[class*=text-small][class*=text-black]",
+    "linkSelector": "a[href*=/jobs/posting-]"
   }
 ]

@@ -17,8 +17,12 @@ import java.util.List;
 public class JobScraper {
 
     private static final String USER_AGENT =
-            "Mozilla/5.0 (compatible; JobAdsBot/1.0; +https://github.com/Nishanthem/news-job-ads-video)";
-    private static final int TIMEOUT_MS = 15_000;
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                    + "Chrome/133.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 30_000;
+    /** Some sites (e.g. flaky government servers) intermittently return 500/timeouts; retry a few times. */
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_BACKOFF_MS = 3_000;
 
     /**
      * Scrape a single configured site. Network/parse failures are logged and result in an empty list
@@ -26,12 +30,8 @@ public class JobScraper {
      */
     public List<JobPosting> scrape(SiteConfig site) {
         List<JobPosting> jobs = new ArrayList<>();
-        try {
-            Document doc = Jsoup.connect(site.getUrl())
-                    .userAgent(USER_AGENT)
-                    .timeout(TIMEOUT_MS)
-                    .get();
-
+        Document doc = fetch(site.getUrl());
+        if (doc != null) {
             Elements items = doc.select(site.getItemSelector());
             for (Element item : items) {
                 String title = text(item, site.getTitleSelector(), item.text());
@@ -40,20 +40,54 @@ public class JobScraper {
                 }
                 String company = text(item, site.getCompanySelector(), "");
                 String location = text(item, site.getLocationSelector(), "");
+                String qualification = text(item, site.getQualificationSelector(), "");
+                String salary = text(item, site.getSalarySelector(), "");
+                String contact = text(item, site.getContactSelector(), "");
+                String lastDate = text(item, site.getLastDateSelector(), "");
                 String link = link(item, site.getLinkSelector());
 
                 JobPosting job = new JobPosting();
                 job.setTitle(title.trim());
                 job.setCompany(company.trim());
                 job.setLocation(location.trim());
+                job.setQualification(qualification.trim());
+                job.setSalary(salary.trim());
+                job.setContact(contact.trim());
+                job.setLastDate(lastDate.trim());
                 job.setSource(site.getName());
                 job.setLink(link);
                 jobs.add(job);
             }
-        } catch (IOException e) {
-            System.err.println("[scraper] failed to scrape " + site.getUrl() + ": " + e.getMessage());
         }
         return jobs;
+    }
+
+    /** Fetch a URL with a few retries to tolerate intermittent server errors / timeouts. */
+    private static Document fetch(String url) {
+        IOException last = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                return Jsoup.connect(url)
+                        .userAgent(USER_AGENT)
+                        .timeout(TIMEOUT_MS)
+                        .get();
+            } catch (IOException e) {
+                last = e;
+                System.err.println("[scraper] attempt " + attempt + "/" + MAX_ATTEMPTS
+                        + " failed for " + url + ": " + e.getMessage());
+                if (attempt < MAX_ATTEMPTS) {
+                    try {
+                        Thread.sleep(RETRY_BACKOFF_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+        System.err.println("[scraper] giving up on " + url
+                + (last != null ? " (" + last.getMessage() + ")" : ""));
+        return null;
     }
 
     /** Scrape every configured site and concatenate the results. */
