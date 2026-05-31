@@ -6,10 +6,13 @@ job websites into a clean video** that can be posted on YouTube, WhatsApp, etc.
 To avoid reproducing copyrighted newspaper artwork, the app **does not screenshot the original
 ads**. Instead it extracts only the *facts* of each job (role, company, location, qualification,
 salary, contact, last date) and renders its **own branded slide** for every job. The slides are then
-stitched into an MP4 with `ffmpeg`.
+stitched into an MP4 with `ffmpeg`. The video also gets a spoken **voice-over** of each job (offline
+text-to-speech) so it can be listened to as well as read; each slide is shown for as long as its
+narration plays.
 
 ```
 scrape (or load sample)  ->  filter job ads  ->  render one slide per job (Java2D)  ->  ffmpeg  ->  jobs.mp4
+                                                  \-> narrate each job (TTS) ----------/
 ```
 
 ## Example output
@@ -40,13 +43,15 @@ This archive is **not** included in the video — it is your proof, kept on the 
 
 - Java 17+
 - Maven 3.6+
-- `ffmpeg` on your `PATH` (used to build the video)
+- `ffmpeg` on your `PATH` (used to build the video and mux the narration audio)
+- A text-to-speech engine for narration (optional): **`pico2wave`** (package `libttspico-utils`,
+  recommended) or **`espeak-ng`**. If neither is present the app just produces a silent video.
 - **Google Chrome / Chromium** installed (only needed for evidence capture when scraping real sites;
   not needed for `--sample`). The matching `chromedriver` is fetched automatically by Selenium
   Manager. If Chrome is in a non-standard location, set `CHROME_BINARY=/path/to/chrome` (or
   `-Dchrome.binary=...`).
 
-On Ubuntu/Debian: `sudo apt-get install -y maven ffmpeg`
+On Ubuntu/Debian: `sudo apt-get install -y maven ffmpeg libttspico-utils espeak-ng`
 
 ## Build
 
@@ -103,11 +108,12 @@ the element/class that wraps each listing.
 | `--sources <file>` | – | Path to a `sources.json` of sites to scrape |
 | `--out <file>` | `jobs.mp4` | Output video path |
 | `--brand <text>` | `Job Alerts` | Title shown in the slide header |
-| `--seconds <n>` | `5` | Seconds each slide is shown |
+| `--seconds <n>` | `5` | Seconds each slide is shown (used for slides without narration; with narration each slide lasts as long as its voice-over) |
 | `--fps <n>` | `25` | Video frame rate |
 | `--limit <n>` | none | Cap the number of jobs |
 | `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
 | `--no-evidence` | off | Skip capturing evidence screenshots |
+| `--no-audio` | off | Skip the spoken narration (otherwise on when a TTS engine is available) |
 
 ## Project layout
 
@@ -120,7 +126,8 @@ src/main/java/com/jobads/
   filter/JobFilter.java     # keep job ads, drop noise
   scraper/EvidenceCapture.java # screenshot the real ads as proof (headless Chrome)
   image/SlideGenerator.java # render a clean slide per job (Java2D)
-  video/VideoBuilder.java   # combine slides into mp4 via ffmpeg
+  audio/Narrator.java       # spoken voice-over per job (offline TTS)
+  video/VideoBuilder.java   # combine slides into mp4 via ffmpeg (+ mux narration)
   model/EvidenceItem.java   # one manifest entry of captured proof
 ```
 

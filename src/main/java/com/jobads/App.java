@@ -1,6 +1,7 @@
 package com.jobads;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jobads.audio.Narrator;
 import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
 import com.jobads.model.JobPosting;
@@ -39,6 +40,7 @@ import java.util.Map;
  *     --limit &lt;n&gt;           cap the number of jobs (default: no limit)
  *     --evidence &lt;dir&gt;      directory to save proof-of-source evidence (default: &lt;out&gt;/evidence)
  *     --no-evidence         skip capturing evidence screenshots
+ *     --no-audio            skip spoken narration (otherwise on when a TTS engine is available)
  * </pre>
  *
  * <p>When scraping real sites, the app also captures an evidence archive (a screenshot of each
@@ -100,8 +102,31 @@ public class App {
         List<Path> slides = slideGenerator.renderAll(
                 jobs, workDir, brand, jobs.size() + " job openings for you");
 
-        System.out.println("[app] building video with ffmpeg -> " + output.toAbsolutePath());
-        new VideoBuilder(seconds, fps).build(slides, output);
+        VideoBuilder videoBuilder = new VideoBuilder(seconds, fps);
+        boolean wantAudio = !opts.containsKey("no-audio");
+        Narrator narrator = new Narrator();
+
+        if (wantAudio && narrator.isAvailable()) {
+            System.out.println("[app] generating narration with " + narrator.engineName()
+                    + " (use --no-audio to disable)");
+            List<Path> audios = new ArrayList<>();
+            // slides[0] is the intro card; slides[1..] line up with jobs.
+            audios.add(narrator.synth(narrator.introText(brand, jobs.size()),
+                    workDir.resolve("voice-000.wav")));
+            for (int i = 0; i < jobs.size(); i++) {
+                String text = narrator.jobText(jobs.get(i), i + 1, jobs.size());
+                audios.add(narrator.synth(text, workDir.resolve(String.format("voice-%03d.wav", i + 1))));
+            }
+            System.out.println("[app] building narrated video with ffmpeg -> " + output.toAbsolutePath());
+            videoBuilder.buildWithAudio(slides, audios, output);
+        } else {
+            if (wantAudio) {
+                System.out.println("[app] no TTS engine found (install pico2wave or espeak-ng for "
+                        + "narration); building a silent video.");
+            }
+            System.out.println("[app] building video with ffmpeg -> " + output.toAbsolutePath());
+            videoBuilder.build(slides, output);
+        }
 
         System.out.println("[app] DONE. Video written to: " + output.toAbsolutePath());
     }

@@ -1,5 +1,6 @@
 package com.jobads;
 
+import com.jobads.audio.Narrator;
 import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
 import com.jobads.model.JobPosting;
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,5 +66,35 @@ class PipelineTest {
         for (Path p : slides) {
             assertTrue(Files.exists(p));
         }
+    }
+
+    @Test
+    void narratorBuildsConciseSpokenText() {
+        Narrator narrator = new Narrator();
+
+        JobPosting job = new JobPosting();
+        job.setTitle("Lead Consultant");
+        job.setCompany("National Disaster Management Authority");
+        job.setLastDate("22/05/2026");
+        job.setQualification("M.Tech with 10 years experience");
+        job.setContact("careers@example.com");
+        job.setSource("Employment News (employmentnews.gov.in)");
+
+        String spoken = narrator.jobText(job, 1, 9);
+        assertTrue(spoken.contains("Job 1 of 9"));
+        assertTrue(spoken.contains("Lead Consultant"));
+        assertTrue(spoken.contains("22 May 2026"), "date should be humanised for speech");
+        // The slow-to-read fields and URL are intentionally NOT spoken.
+        assertFalse(spoken.contains("M.Tech"), "qualification should not be narrated");
+        assertFalse(spoken.contains("@"), "contact should not be narrated");
+        assertFalse(spoken.contains("employmentnews.gov.in"), "URL should be stripped from source");
+    }
+
+    @Test
+    void narratorHumanisesDates() {
+        assertEquals("15 June 2026", Narrator.spokenDate("15/06/2026"));
+        assertEquals("1 January 2027", Narrator.spokenDate("01-01-2027"));
+        // Non dd/mm/yyyy values are passed through unchanged.
+        assertEquals("Open until filled", Narrator.spokenDate("Open until filled"));
     }
 }
