@@ -76,6 +76,7 @@ class PipelineTest {
         job.setTitle("Lead Consultant");
         job.setCompany("National Disaster Management Authority");
         job.setLastDate("22/05/2026");
+        job.setSalary("Rs. 25,000 - 35,000 / month");
         job.setQualification("M.Tech with 10 years experience");
         job.setContact("careers@example.com");
         job.setSource("Employment News (employmentnews.gov.in)");
@@ -84,6 +85,9 @@ class PipelineTest {
         assertTrue(spoken.contains("Job 1 of 9"));
         assertTrue(spoken.contains("Lead Consultant"));
         assertTrue(spoken.contains("22 May 2026"), "date should be humanised for speech");
+        // Currency should be expanded for natural reading.
+        assertTrue(spoken.contains("rupees"), "Rs. should be expanded to rupees");
+        assertFalse(spoken.contains("Rs."), "Rs. abbreviation should be gone");
         // The slow-to-read fields and URL are intentionally NOT spoken.
         assertFalse(spoken.contains("M.Tech"), "qualification should not be narrated");
         assertFalse(spoken.contains("@"), "contact should not be narrated");

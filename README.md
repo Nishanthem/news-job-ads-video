@@ -44,14 +44,27 @@ This archive is **not** included in the video — it is your proof, kept on the 
 - Java 17+
 - Maven 3.6+
 - `ffmpeg` on your `PATH` (used to build the video and mux the narration audio)
-- A text-to-speech engine for narration (optional): **`pico2wave`** (package `libttspico-utils`,
-  recommended) or **`espeak-ng`**. If neither is present the app just produces a silent video.
+- A text-to-speech engine for narration (optional, any one):
+  1. **Piper** (`pip install piper-tts`) + the Indian-English voice model `en_IN-spicor-medium`
+     (natural Indian accent, recommended). Place the `.onnx` + `.onnx.json` in
+     `~/piper-voices/` or set `PIPER_MODEL=/path/to/model.onnx`.
+  2. **espeak-ng** (`sudo apt install espeak-ng`) — lighter, robotic but correct numbers.
+  3. **pico2wave** (`sudo apt install libttspico-utils`) — smooth but reads numbers digit-by-digit.
+  If none is installed the app just produces a silent video.
 - **Google Chrome / Chromium** installed (only needed for evidence capture when scraping real sites;
   not needed for `--sample`). The matching `chromedriver` is fetched automatically by Selenium
   Manager. If Chrome is in a non-standard location, set `CHROME_BINARY=/path/to/chrome` (or
   `-Dchrome.binary=...`).
 
-On Ubuntu/Debian: `sudo apt-get install -y maven ffmpeg libttspico-utils espeak-ng`
+On Ubuntu/Debian:
+```bash
+sudo apt-get install -y maven ffmpeg espeak-ng libttspico-utils
+pip install piper-tts   # recommended for Indian-English neural voice
+# Download the Indian English voice model:
+mkdir -p ~/piper-voices
+curl -sL 'https://huggingface.co/navgurukul-ai-labs/text-to-speech-en-IN-piper/resolve/main/en_IN-dataset%3Dspicor-english-base%3Dljspeech-epochs%3D1089.onnx' -o ~/piper-voices/en_IN-spicor-medium.onnx
+curl -sL 'https://huggingface.co/navgurukul-ai-labs/text-to-speech-en-IN-piper/resolve/main/en_IN-dataset%3Dspicor-english-base%3Dljspeech-epochs%3D1089.onnx.json' -o ~/piper-voices/en_IN-spicor-medium.onnx.json
+```
 
 ## Build
 

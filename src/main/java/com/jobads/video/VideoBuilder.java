@@ -117,12 +117,12 @@ public class VideoBuilder {
                 int delayMs = (int) Math.round(leadSec * 1000);
                 runFfmpeg(List.of("-y", "-i", audio.toAbsolutePath().toString(),
                         "-af", "adelay=" + delayMs + "|" + delayMs + ",apad",
-                        "-t", fmt(total), "-ar", "16000", "-ac", "1",
+                        "-t", fmt(total), "-ar", "22050", "-ac", "1",
                         padded.toAbsolutePath().toString()));
             } else {
                 // Pure silence matching the slide duration.
                 runFfmpeg(List.of("-y", "-f", "lavfi", "-i",
-                        "anullsrc=channel_layout=mono:sample_rate=16000",
+                        "anullsrc=channel_layout=mono:sample_rate=22050",
                         "-t", fmt(total), padded.toAbsolutePath().toString()));
             }
             paddedAudios.add(padded);

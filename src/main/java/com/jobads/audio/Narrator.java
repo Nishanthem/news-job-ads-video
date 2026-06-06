@@ -3,16 +3,26 @@ package com.jobads.audio;
 import com.jobads.model.JobPosting;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Turns a {@link JobPosting} into a short spoken voice-over (a WAV file) using an offline
  * text-to-speech engine, so the generated video can be listened to as well as read.
  *
- * <p>No API keys are required: it uses whichever local engine is available — preferring
- * {@code pico2wave} (SVOX Pico, natural English) and falling back to {@code espeak-ng}.
- * If neither is installed the app simply produces a silent video.
+ * <p>No API keys are required. Engine preference:
+ * <ol>
+ *   <li><b>Piper</b> with an Indian-English neural voice ({@code en_IN-spicor-medium}) — natural
+ *       Indian accent. The model must be present on disk; set {@code PIPER_MODEL} to override the
+ *       search path.</li>
+ *   <li><b>espeak-ng</b> — lighter, robotic but reads numbers correctly.</li>
+ *   <li><b>pico2wave</b> — SVOX Pico, smooth but reads numbers digit-by-digit and has no Indian
+ *       accent.</li>
+ * </ol>
+ * If no engine is available the app simply produces a silent video.
  */
 public class Narrator {
 
@@ -21,20 +31,33 @@ public class Narrator {
             "July", "August", "September", "October", "November", "December"
     };
 
-    private final String engine; // "pico2wave", "espeak-ng", or null
+    private final String engine;    // "piper", "espeak-ng", "pico2wave", or null
+    private final String piperModel; // path to .onnx (only when engine == "piper")
 
     public Narrator() {
-        this.engine = detectEngine();
+        String model = findPiperModel();
+        if (model != null && commandExists("piper")) {
+            this.engine = "piper";
+            this.piperModel = model;
+        } else if (commandExists("espeak-ng")) {
+            this.engine = "espeak-ng";
+            this.piperModel = null;
+        } else if (commandExists("pico2wave")) {
+            this.engine = "pico2wave";
+            this.piperModel = null;
+        } else {
+            this.engine = null;
+            this.piperModel = null;
+        }
     }
 
-    /** @return true if a local TTS engine was found. */
     public boolean isAvailable() {
         return engine != null;
     }
 
-    /** @return the name of the detected engine, or {@code "none"}. */
     public String engineName() {
-        return engine == null ? "none" : engine;
+        if (engine == null) return "none";
+        return "piper".equals(engine) ? "piper (en_IN-spicor, Indian English)" : engine;
     }
 
     /** Build the spoken line for the intro card. */
@@ -44,9 +67,8 @@ public class Narrator {
     }
 
     /**
-     * Build the spoken line for a single job. Kept concise on purpose: the qualification and
-     * contact details are shown on the slide to read, but are not read aloud (an email/phone read
-     * out character by character makes each clip very long and tiring to listen to).
+     * Build the spoken line for a single job. Qualification and contact are shown on the slide to
+     * read but omitted from speech (emails/phones read character-by-character are painful to hear).
      */
     public String jobText(JobPosting job, int index, int total) {
         StringBuilder sb = new StringBuilder();
@@ -70,11 +92,6 @@ public class Narrator {
         return sb.toString();
     }
 
-    /**
-     * Spoken form of the source name: drop any parenthetical (often a website/URL that a TTS engine
-     * reads slowly letter by letter), e.g. "Employment News (employmentnews.gov.in)" -> "Employment
-     * News".
-     */
     static String spokenSource(String source) {
         String s = source.replaceAll("\\(.*?\\)", " ");
         return sanitize(s);
@@ -90,15 +107,28 @@ public class Narrator {
         }
         try {
             ProcessBuilder pb;
-            if ("pico2wave".equals(engine)) {
-                pb = new ProcessBuilder("pico2wave", "-l", "en-US",
-                        "-w", outWav.toAbsolutePath().toString(), text);
-            } else {
-                // espeak-ng: -s words per minute (slightly slower for clarity)
+            if ("piper".equals(engine)) {
+                pb = new ProcessBuilder("piper",
+                        "--model", piperModel,
+                        "--output_file", outWav.toAbsolutePath().toString());
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                try (OutputStream os = p.getOutputStream()) {
+                    os.write(text.getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+                p.getInputStream().readAllBytes();
+                int exit = p.waitFor();
+                return exit == 0 && Files.exists(outWav) ? outWav : null;
+            } else if ("espeak-ng".equals(engine)) {
                 pb = new ProcessBuilder("espeak-ng", "-v", "en-us", "-s", "150",
                         "-w", outWav.toAbsolutePath().toString(), text);
+            } else {
+                pb = new ProcessBuilder("pico2wave", "-l", "en-US",
+                        "-w", outWav.toAbsolutePath().toString(), text);
             }
-            Process p = pb.redirectErrorStream(true).start();
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             p.getInputStream().readAllBytes();
             int exit = p.waitFor();
             return exit == 0 ? outWav : null;
@@ -110,6 +140,8 @@ public class Narrator {
             return null;
         }
     }
+
+    // ---- text normalisation ----
 
     /** Convert dd/mm/yyyy (or dd-mm-yyyy) to a spoken date like "15 May 2026". */
     public static String spokenDate(String raw) {
@@ -135,14 +167,17 @@ public class Narrator {
         if (text == null) {
             return "";
         }
-        String s = text.replace("&", " and ")
+        String s = text;
+        // Currency expansion — "Rs." and "₹" should be spoken as "rupees".
+        s = s.replaceAll("(?i)Rs\\.?\\s*", "rupees ");
+        s = s.replace("₹", "rupees ");
+        s = s.replace("&", " and ")
                 .replace("/", " ")
                 .replace("\n", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
-        // Very long lines tire the listener; keep the spoken version reasonable.
-        if (s.length() > 180) {
-            s = s.substring(0, 180);
+        if (s.length() > 200) {
+            s = s.substring(0, 200);
         }
         return s;
     }
@@ -151,10 +186,26 @@ public class Narrator {
         return s != null && !s.isBlank();
     }
 
-    private static String detectEngine() {
-        for (String e : new String[] {"pico2wave", "espeak-ng"}) {
-            if (commandExists(e)) {
-                return e;
+    // ---- engine detection ----
+
+    /**
+     * Look for a Piper Indian-English voice model on disk. Check {@code PIPER_MODEL} env var first,
+     * then well-known locations.
+     */
+    private static String findPiperModel() {
+        String envModel = System.getenv("PIPER_MODEL");
+        if (envModel != null && Files.isRegularFile(Paths.get(envModel))) {
+            return envModel;
+        }
+        String home = System.getProperty("user.home", "/home/ubuntu");
+        String[] candidates = {
+                home + "/piper-voices/en_IN-spicor-medium.onnx",
+                home + "/.local/share/piper-voices/en_IN-spicor-medium.onnx",
+                "piper-voices/en_IN-spicor-medium.onnx",
+        };
+        for (String c : candidates) {
+            if (Files.isRegularFile(Paths.get(c))) {
+                return c;
             }
         }
         return null;
