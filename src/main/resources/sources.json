@@ -5,7 +5,8 @@
     "itemSelector": "tr:has(span[id*=RepDetails_Label4_])",
     "titleSelector": "span[id*=RepDetails_Label4_]",
     "companySelector": "span[id*=RepDetails_Label3_]",
-    "lastDateSelector": "span[id*=RepDetails_Label6_]"
+    "lastDateSelector": "span[id*=RepDetails_Label6_]",
+    "applyHow": "Apply as per the official notification on employmentnews.gov.in"
   },
   {
     "name": "Times Ascent (Times of India jobs)",

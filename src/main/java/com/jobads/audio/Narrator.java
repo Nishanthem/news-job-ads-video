@@ -86,10 +86,32 @@ public class Narrator {
         if (notBlank(job.getLastDate())) {
             sb.append("Last date to apply, ").append(spokenDate(job.getLastDate())).append(". ");
         }
+        sb.append("How to apply, ").append(spokenApply(job)).append(". ");
         if (notBlank(job.getSource())) {
             sb.append("Source, ").append(spokenSource(job.getSource())).append(".");
         }
         return sb.toString();
+    }
+
+    /**
+     * Spoken form of "how to apply". Emails, links and phone numbers are read out
+     * character-by-character by a TTS engine (painful to hear), so for those we point the listener
+     * to the on-screen details; plain instructions (e.g. "Walk-in interview") are read as-is.
+     */
+    static String spokenApply(JobPosting job) {
+        String raw = job.getApplyInfo();
+        String lower = raw.toLowerCase();
+        boolean hasEmail = raw.contains("@");
+        boolean hasUrl = lower.contains("http") || lower.contains("www.")
+                || lower.matches(".*\\b[a-z0-9.-]+\\.(com|in|org|gov|net|edu|co)\\b.*");
+        boolean hasPhone = raw.replaceAll("[^0-9]", "").length() >= 7;
+        if (hasEmail || hasUrl) {
+            return "apply using the link and contact details shown on screen";
+        }
+        if (hasPhone) {
+            return "apply using the phone number shown on screen";
+        }
+        return sanitize(raw);
     }
 
     static String spokenSource(String source) {

@@ -42,6 +42,12 @@ public class SiteConfig {
     /** CSS selector (relative to the item) for the last/closing date. Optional. */
     private String lastDateSelector;
 
+    /** CSS selector (relative to the item) for a "how to apply" instruction. Optional. */
+    private String applyHowSelector;
+
+    /** Literal fallback "how to apply" instruction for every job from this site. Optional. */
+    private String applyHow;
+
     public String getName() {
         return name;
     }
@@ -128,5 +134,21 @@ public class SiteConfig {
 
     public void setLastDateSelector(String lastDateSelector) {
         this.lastDateSelector = lastDateSelector;
+    }
+
+    public String getApplyHowSelector() {
+        return applyHowSelector;
+    }
+
+    public void setApplyHowSelector(String applyHowSelector) {
+        this.applyHowSelector = applyHowSelector;
+    }
+
+    public String getApplyHow() {
+        return applyHow;
+    }
+
+    public void setApplyHow(String applyHow) {
+        this.applyHow = applyHow;
     }
 }

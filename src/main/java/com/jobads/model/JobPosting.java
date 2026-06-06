@@ -20,6 +20,8 @@ public class JobPosting {
     private String lastDate;
     private String source;
     private String link;
+    /** Explicit "how to apply" instruction, when the source provides one. */
+    private String applyHow;
 
     public JobPosting() {
         // for Jackson
@@ -108,6 +110,33 @@ public class JobPosting {
 
     public void setLink(String link) {
         this.link = link;
+    }
+
+    public String getApplyHow() {
+        return applyHow;
+    }
+
+    public void setApplyHow(String applyHow) {
+        this.applyHow = applyHow;
+    }
+
+    /**
+     * A best-effort "how to apply" instruction for the slide/narration: prefers an explicit
+     * {@code applyHow}, then the scraped contact, then the application link, otherwise a generic
+     * pointer back to the source. Never returns blank.
+     */
+    public String getApplyInfo() {
+        if (applyHow != null && !applyHow.isBlank()) {
+            return applyHow.trim();
+        }
+        if (contact != null && !contact.isBlank()) {
+            return contact.trim();
+        }
+        if (link != null && !link.isBlank()) {
+            return "Apply online at " + link.trim();
+        }
+        return "See the original notification in "
+                + (source != null && !source.isBlank() ? source.trim() : "the newspaper listing");
     }
 
     @Override

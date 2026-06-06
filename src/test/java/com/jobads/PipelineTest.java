@@ -88,10 +88,36 @@ class PipelineTest {
         // Currency should be expanded for natural reading.
         assertTrue(spoken.contains("rupees"), "Rs. should be expanded to rupees");
         assertFalse(spoken.contains("Rs."), "Rs. abbreviation should be gone");
-        // The slow-to-read fields and URL are intentionally NOT spoken.
+        // "How to apply" must be narrated, but the raw email is not read out aloud.
+        assertTrue(spoken.contains("How to apply"), "how-to-apply should be narrated");
         assertFalse(spoken.contains("M.Tech"), "qualification should not be narrated");
-        assertFalse(spoken.contains("@"), "contact should not be narrated");
+        assertFalse(spoken.contains("@"), "contact email should not be read out aloud");
         assertFalse(spoken.contains("employmentnews.gov.in"), "URL should be stripped from source");
+    }
+
+    @Test
+    void applyInfoFallsBackSensibly() {
+        // Explicit applyHow wins.
+        JobPosting a = new JobPosting();
+        a.setApplyHow("Walk-in interview on Monday");
+        a.setContact("ignored@example.com");
+        assertEquals("Walk-in interview on Monday", a.getApplyInfo());
+
+        // No applyHow -> use contact.
+        JobPosting b = new JobPosting();
+        b.setContact("hr@firm.example");
+        assertEquals("hr@firm.example", b.getApplyInfo());
+
+        // No applyHow/contact -> use link.
+        JobPosting c = new JobPosting();
+        c.setLink("https://jobs.example/posting-1");
+        assertTrue(c.getApplyInfo().contains("https://jobs.example/posting-1"));
+
+        // Nothing -> generic pointer to the source, never blank.
+        JobPosting d = new JobPosting();
+        d.setSource("Employment News");
+        assertTrue(d.getApplyInfo().contains("Employment News"));
+        assertFalse(d.getApplyInfo().isBlank());
     }
 
     @Test

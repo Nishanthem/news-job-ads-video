@@ -6,6 +6,7 @@
     "qualification": "B.Sc Nursing / GNM, registered with State Nursing Council",
     "salary": "Rs. 25,000 - 35,000 / month",
     "contact": "careers@citygeneral.example, 040-1234567",
+    "applyHow": "Email your resume to careers@citygeneral.example or call 040-1234567",
     "lastDate": "15 June 2026",
     "source": "Sample Newspaper Classifieds"
   },
@@ -16,6 +17,7 @@
     "qualification": "B.Ed with relevant graduation; D.El.Ed for primary",
     "salary": "As per school norms",
     "contact": "Walk-in interview, bring resume + certificates",
+    "applyHow": "Walk-in interview with original certificates and a resume",
     "lastDate": "10 June 2026",
     "source": "Sample Newspaper Classifieds"
   },
@@ -26,6 +28,7 @@
     "qualification": "B.Com with Tally & GST knowledge, 2+ years experience",
     "salary": "Rs. 20,000 / month negotiable",
     "contact": "9876543210 (WhatsApp resume)",
+    "applyHow": "WhatsApp your resume to 9876543210",
     "lastDate": "20 June 2026",
     "source": "Sample Newspaper Classifieds"
   },
@@ -36,6 +39,7 @@
     "qualification": "Any graduate, two-wheeler with licence preferred",
     "salary": "Rs. 18,000 + incentives",
     "contact": "hr@aquapure.example",
+    "applyHow": "Email your resume to hr@aquapure.example",
     "lastDate": "Open until filled",
     "source": "Sample Newspaper Classifieds"
   },
@@ -46,6 +50,7 @@
     "qualification": "ITI in Electrician / Fitter trade, freshers welcome",
     "salary": "Stipend Rs. 12,000 / month",
     "contact": "Apply online at careers.bharatmfg.example",
+    "applyHow": "Apply online at careers.bharatmfg.example",
     "lastDate": "30 June 2026",
     "source": "Sample Newspaper Classifieds"
   }

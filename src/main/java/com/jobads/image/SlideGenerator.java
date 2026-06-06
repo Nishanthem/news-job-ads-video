@@ -102,8 +102,9 @@ public class SlideGenerator {
         y = detail(g, "Location", job.getLocation(), y);
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);
-        y = detail(g, "Contact", job.getContact(), y);
         y = detail(g, "Last Date", job.getLastDate(), y);
+        // "How to Apply" highlighted so the viewer always knows the next step.
+        y = detail(g, "How to Apply", job.getApplyInfo(), y, ACCENT);
 
         // Footer / source attribution
         g.setColor(MUTED);
@@ -116,10 +117,14 @@ public class SlideGenerator {
     }
 
     private int detail(Graphics2D g, String label, String value, int y) {
+        return detail(g, label, value, y, MUTED);
+    }
+
+    private int detail(Graphics2D g, String label, String value, int y, Color labelColor) {
         if (value == null || value.isBlank()) {
             return y;
         }
-        g.setColor(MUTED);
+        g.setColor(labelColor);
         g.setFont(new Font("SansSerif", Font.BOLD, 28));
         g.drawString(label + ":", 60, y);
 

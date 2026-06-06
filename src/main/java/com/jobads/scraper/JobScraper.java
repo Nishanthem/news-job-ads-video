@@ -45,6 +45,8 @@ public class JobScraper {
                 String contact = text(item, site.getContactSelector(), "");
                 String lastDate = text(item, site.getLastDateSelector(), "");
                 String link = link(item, site.getLinkSelector());
+                String applyHow = text(item, site.getApplyHowSelector(),
+                        site.getApplyHow() != null ? site.getApplyHow() : "");
 
                 JobPosting job = new JobPosting();
                 job.setTitle(title.trim());
@@ -56,6 +58,7 @@ public class JobScraper {
                 job.setLastDate(lastDate.trim());
                 job.setSource(site.getName());
                 job.setLink(link);
+                job.setApplyHow(applyHow.trim());
                 jobs.add(job);
             }
         }
