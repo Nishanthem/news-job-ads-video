@@ -15,7 +15,17 @@ public class JobFilter {
     private static final String[] JOB_KEYWORDS = {
             "hiring", "vacancy", "vacancies", "wanted", "recruitment", "recruit", "job", "jobs",
             "position", "apply", "walk-in", "walk in", "required", "openings", "opening",
-            "appointment", "employment", "career", "staff needed"
+            "appointment", "employment", "career", "staff needed",
+            // Malayalam roots so Malayalam-language sources (e.g. Mathrubhumi Thozhil Vartha) are kept.
+            // Case folding does not affect Malayalam, so these are matched as-is.
+            "ഒഴിവ",        // vacancy
+            "വിജ്ഞാപന",    // notification
+            "അപേക്ഷ",      // application / apply
+            "നിയമന",       // appointment
+            "റിക്രൂട്ട",     // recruitment
+            "തസ്തിക",       // post / position
+            "ജോലി",        // job
+            "പി.എസ്.സി"    // PSC (Public Service Commission)
     };
 
     private static final String[] NOISE_KEYWORDS = {
