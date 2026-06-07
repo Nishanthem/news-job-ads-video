@@ -127,4 +127,25 @@ class PipelineTest {
         // Non dd/mm/yyyy values are passed through unchanged.
         assertEquals("Open until filled", Narrator.spokenDate("Open until filled"));
     }
+
+    @Test
+    void containsMalayalamDetectsScript() {
+        assertTrue(Narrator.containsMalayalam("ഒഴിവ് 133 vacancies"), "should detect Malayalam");
+        assertTrue(Narrator.containsMalayalam("Job 1. പി.എസ്.സി. വിജ്ഞാപനം"), "mixed text");
+        assertFalse(Narrator.containsMalayalam("Lead Consultant"), "pure English -> false");
+        assertFalse(Narrator.containsMalayalam(""), "empty -> false");
+    }
+
+    @Test
+    void filterKeepsMalayalamJobNotifications() {
+        JobFilter filter = new JobFilter();
+
+        JobPosting mlJob = new JobPosting();
+        mlJob.setTitle("സഹകരണസംഘത്തിൽ 133 ഒഴിവ്; അപേക്ഷ ക്ഷണിച്ചു");
+        assertTrue(filter.isJobAd(mlJob), "Malayalam job with ഒഴിവ should be kept");
+
+        JobPosting mlPsc = new JobPosting();
+        mlPsc.setTitle("16 കാറ്റഗറികളിൽ പി.എസ്.സി. വിജ്ഞാപനം");
+        assertTrue(filter.isJobAd(mlPsc), "PSC notification in Malayalam should be kept");
+    }
 }

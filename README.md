@@ -48,8 +48,11 @@ This archive is **not** included in the video — it is your proof, kept on the 
   1. **Piper** (`pip install piper-tts`) + the Indian-English voice model `en_IN-spicor-medium`
      (natural Indian accent, recommended). Place the `.onnx` + `.onnx.json` in
      `~/piper-voices/` or set `PIPER_MODEL=/path/to/model.onnx`.
-  2. **espeak-ng** (`sudo apt install espeak-ng`) — lighter, robotic but correct numbers.
-  3. **pico2wave** (`sudo apt install libttspico-utils`) — smooth but reads numbers digit-by-digit.
+  2. *(Optional)* **Malayalam voice** `ml_IN-meera-medium` for Mathrubhumi/Malayalam-language slides.
+     Place it in `~/piper-voices/` alongside the English model. When present the app automatically
+     narrates slides containing Malayalam text with the Malayalam voice.
+  3. **espeak-ng** (`sudo apt install espeak-ng`) — lighter, robotic but correct numbers.
+  4. **pico2wave** (`sudo apt install libttspico-utils`) — smooth but reads numbers digit-by-digit.
   If none is installed the app just produces a silent video.
 - **Google Chrome / Chromium** installed (only needed for evidence capture when scraping real sites;
   not needed for `--sample`). The matching `chromedriver` is fetched automatically by Selenium
@@ -64,6 +67,9 @@ pip install piper-tts   # recommended for Indian-English neural voice
 mkdir -p ~/piper-voices
 curl -sL 'https://huggingface.co/navgurukul-ai-labs/text-to-speech-en-IN-piper/resolve/main/en_IN-dataset%3Dspicor-english-base%3Dljspeech-epochs%3D1089.onnx' -o ~/piper-voices/en_IN-spicor-medium.onnx
 curl -sL 'https://huggingface.co/navgurukul-ai-labs/text-to-speech-en-IN-piper/resolve/main/en_IN-dataset%3Dspicor-english-base%3Dljspeech-epochs%3D1089.onnx.json' -o ~/piper-voices/en_IN-spicor-medium.onnx.json
+# (Optional) Download the Malayalam voice model for Mathrubhumi Thozhil Vartha:
+curl -sL 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ml/ml_IN/meera/medium/ml_IN-meera-medium.onnx' -o ~/piper-voices/ml_IN-meera-medium.onnx
+curl -sL 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ml/ml_IN/meera/medium/ml_IN-meera-medium.onnx.json' -o ~/piper-voices/ml_IN-meera-medium.onnx.json
 ```
 
 ## Build
