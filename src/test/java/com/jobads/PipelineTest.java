@@ -146,6 +146,15 @@ class PipelineTest {
 
         JobPosting mlPsc = new JobPosting();
         mlPsc.setTitle("16 കാറ്റഗറികളിൽ പി.എസ്.സി. വിജ്ഞാപനം");
-        assertTrue(filter.isJobAd(mlPsc), "PSC notification in Malayalam should be kept");
+        assertTrue(filter.isJobAd(mlPsc), "PSC notification (വിജ്ഞാപനം) should be kept");
+
+        // Career advice articles and rank lists should be dropped.
+        JobPosting advice = new JobPosting();
+        advice.setTitle("സർക്കാർ ജോലിയിലേക്ക് എളുപ്പവഴി");
+        assertFalse(filter.isJobAd(advice), "career advice article should be dropped");
+
+        JobPosting rankList = new JobPosting();
+        rankList.setTitle("കേരള പി.എസ്.സി. റാങ്ക് ലിസ്റ്റുകൾ");
+        assertFalse(filter.isJobAd(rankList), "PSC rank list (not a job opening) should be dropped");
     }
 }
