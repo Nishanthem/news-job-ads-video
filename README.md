@@ -127,6 +127,8 @@ the element/class that wraps each listing.
 | `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
 | `--no-evidence` | off | Skip capturing evidence screenshots |
 | `--no-audio` | off | Skip the spoken narration (otherwise on when a TTS engine is available) |
+| `--disclaimer <text>` | built-in default | Disclaimer card shown & narrated right after the intro |
+| `--no-disclaimer` | off | Omit the disclaimer card |
 
 ## Project layout
 

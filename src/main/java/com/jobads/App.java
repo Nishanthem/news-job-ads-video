@@ -41,6 +41,8 @@ import java.util.Map;
  *     --evidence &lt;dir&gt;      directory to save proof-of-source evidence (default: &lt;out&gt;/evidence)
  *     --no-evidence         skip capturing evidence screenshots
  *     --no-audio            skip spoken narration (otherwise on when a TTS engine is available)
+ *     --disclaimer &lt;text&gt;   custom disclaimer shown/narrated after the intro (has a default)
+ *     --no-disclaimer       omit the disclaimer card
  * </pre>
  *
  * <p>When scraping real sites, the app also captures an evidence archive (a screenshot of each
@@ -51,6 +53,12 @@ import java.util.Map;
 public class App {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final String DEFAULT_DISCLAIMER =
+            "This video is for information only. Job details are summarised from publicly "
+            + "available newspaper and job-portal listings, with the source shown on each slide. "
+            + "Please verify every detail on the official source before applying. We are not the "
+            + "recruiter and do not charge any fee.";
 
     public static void main(String[] args) throws Exception {
         Map<String, String> opts = parseArgs(args);
@@ -96,26 +104,45 @@ public class App {
             return;
         }
 
+        boolean wantDisclaimer = !opts.containsKey("no-disclaimer");
+        String disclaimerText = opts.getOrDefault("disclaimer", DEFAULT_DISCLAIMER);
+
         Path workDir = Files.createTempDirectory("job-slides-");
         System.out.println("[app] rendering " + jobs.size() + " slide(s) to " + workDir);
         SlideGenerator slideGenerator = new SlideGenerator(brand);
-        List<Path> slides = slideGenerator.renderAll(
-                jobs, workDir, brand, jobs.size() + " job openings for you");
+        Narrator narrator = new Narrator();
+
+        // Build slides and their matching narration lines in lock-step so the audio always lines up.
+        List<Path> slides = new ArrayList<>();
+        List<String> narrations = new ArrayList<>();
+
+        int slideNo = 0;
+        slides.add(slideGenerator.renderIntro(brand, jobs.size() + " job openings for you",
+                workDir, String.format("slide-%03d.png", slideNo++)));
+        narrations.add(narrator.introText(brand, jobs.size()));
+
+        if (wantDisclaimer) {
+            slides.add(slideGenerator.renderDisclaimer(disclaimerText, workDir,
+                    String.format("slide-%03d.png", slideNo++)));
+            narrations.add(disclaimerText);
+        }
+
+        for (int i = 0; i < jobs.size(); i++) {
+            slides.add(slideGenerator.renderJob(jobs.get(i), i + 1, jobs.size(), workDir,
+                    String.format("slide-%03d.png", slideNo++)));
+            narrations.add(narrator.jobText(jobs.get(i), i + 1, jobs.size()));
+        }
 
         VideoBuilder videoBuilder = new VideoBuilder(seconds, fps);
         boolean wantAudio = !opts.containsKey("no-audio");
-        Narrator narrator = new Narrator();
 
         if (wantAudio && narrator.isAvailable()) {
             System.out.println("[app] generating narration with " + narrator.engineName()
                     + " (use --no-audio to disable)");
             List<Path> audios = new ArrayList<>();
-            // slides[0] is the intro card; slides[1..] line up with jobs.
-            audios.add(narrator.synth(narrator.introText(brand, jobs.size()),
-                    workDir.resolve("voice-000.wav")));
-            for (int i = 0; i < jobs.size(); i++) {
-                String text = narrator.jobText(jobs.get(i), i + 1, jobs.size());
-                audios.add(narrator.synth(text, workDir.resolve(String.format("voice-%03d.wav", i + 1))));
+            for (int i = 0; i < narrations.size(); i++) {
+                audios.add(narrator.synth(narrations.get(i),
+                        workDir.resolve(String.format("voice-%03d.wav", i))));
             }
             System.out.println("[app] building narrated video with ffmpeg -> " + output.toAbsolutePath());
             videoBuilder.buildWithAudio(slides, audios, output);

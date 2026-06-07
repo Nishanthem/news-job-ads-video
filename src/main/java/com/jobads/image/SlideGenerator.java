@@ -67,6 +67,37 @@ public class SlideGenerator {
     }
 
     /**
+     * Render a disclaimer card (shown right after the intro). The body text is wrapped to fit.
+     */
+    public Path renderDisclaimer(String body, Path outDir, String fileName) throws IOException {
+        BufferedImage img = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = setup(img);
+
+        g.setColor(BG);
+        g.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // Header bar
+        g.setColor(HEADER);
+        g.fillRect(0, 0, WIDTH, 110);
+        g.setColor(TEXT);
+        g.setFont(new Font("SansSerif", Font.BOLD, 40));
+        g.drawString(brand, 50, 70);
+
+        // Title
+        g.setColor(ACCENT);
+        g.setFont(new Font("SansSerif", Font.BOLD, 52));
+        g.drawString("Disclaimer", 60, 210);
+
+        // Body (wrapped)
+        g.setColor(TEXT);
+        Font bodyFont = new Font("SansSerif", Font.PLAIN, 34);
+        drawWrapped(g, body, 60, 270, WIDTH - 120, bodyFont);
+
+        g.dispose();
+        return write(img, outDir, fileName);
+    }
+
+    /**
      * Render a single job slide.
      */
     public Path renderJob(JobPosting job, int index, int total, Path outDir, String fileName)
