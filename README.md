@@ -43,7 +43,10 @@ This archive is **not** included in the video — it is your proof, kept on the 
 
 - Java 17+
 - Maven 3.6+
-- `ffmpeg` on your `PATH` (used to build the video and mux the narration audio)
+- `ffmpeg` on your `PATH` (used to build the video, mux the narration audio, and synthesise the background music)
+- *(Optional, only for `--input`)* tools to read PDF/image job ads:
+  - `pdftotext` and `pdftoppm` from **poppler-utils** (PDF text + rasterising scanned PDFs)
+  - **tesseract** OCR with the English + Malayalam packs (`tesseract-ocr tesseract-ocr-mal`) for images/scans
 - A text-to-speech engine for narration (optional, any one):
   1. **Piper** (`pip install piper-tts`) + the Indian-English voice model `en_IN-spicor-medium`
      (natural Indian accent, recommended). Place the `.onnx` + `.onnx.json` in
@@ -62,6 +65,8 @@ This archive is **not** included in the video — it is your proof, kept on the 
 On Ubuntu/Debian:
 ```bash
 sudo apt-get install -y maven ffmpeg espeak-ng libttspico-utils
+# Optional, for reading PDF/image job ads (--input) and Malayalam rendering/OCR:
+sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mal fonts-noto-core
 pip install piper-tts   # recommended for Indian-English neural voice
 # Download the Indian English voice model:
 mkdir -p ~/piper-voices
@@ -119,6 +124,32 @@ Every site has a different HTML layout, so you set the CSS selectors per site:
 To find the right selectors: open the page in a browser, right-click an ad → **Inspect**, and note
 the element/class that wraps each listing.
 
+### 3. Import job ads you already have as PDF or image
+
+Give the app a single file or a folder of them; it extracts the details and renders the same clean,
+copyright-safe slides (the original file is **not** shown in the video).
+
+```bash
+java -jar target/news-job-ads-video.jar --input my-ads/ --out jobs.mp4 --brand "Daily Job Alerts"
+```
+
+- **PDFs** are read with `pdftotext`; scanned PDFs (no text layer) are rasterised and OCR'd.
+- **Images** (`.png/.jpg/.jpeg/.tif/.bmp/.webp`) are read with `tesseract` OCR (English + Malayalam).
+- The importer understands `Label: value` lines (`Title`, `Company`, `Location`, `Qualification`,
+  `Salary`, `Last date`, `How to apply`, `Contact`); otherwise it uses the first line as the title.
+- OCR is not perfect (especially Malayalam on scans) — review the extracted details before publishing.
+- `--input` can be combined with `--sources`; imported ads bypass the keyword filter.
+
+### Background music
+
+A gentle, **royalty-free** background track plays quietly under the narration by default (it is
+synthesised from scratch with ffmpeg, so it is YouTube-safe). Override or disable it:
+
+```bash
+java -jar target/news-job-ads-video.jar --sample --music my-track.mp3   # use your own track
+java -jar target/news-job-ads-video.jar --sample --no-music             # turn music off
+```
+
 ### Options
 
 | Flag | Default | Meaning |
@@ -132,7 +163,10 @@ the element/class that wraps each listing.
 | `--limit <n>` | none | Cap the number of jobs |
 | `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
 | `--no-evidence` | off | Skip capturing evidence screenshots |
+| `--input <path>` | – | A PDF/image file (or folder of them) to read job ads from |
 | `--no-audio` | off | Skip the spoken narration (otherwise on when a TTS engine is available) |
+| `--music <file>` | synthesised bed | Background-music file looped quietly under the video |
+| `--no-music` | off | Disable background music |
 | `--disclaimer <text>` | built-in default | Disclaimer card shown & narrated right after the intro |
 | `--no-disclaimer` | off | Omit the disclaimer card |
 
@@ -146,9 +180,11 @@ src/main/java/com/jobads/
   scraper/SiteConfig.java   # per-site selector config
   filter/JobFilter.java     # keep job ads, drop noise
   scraper/EvidenceCapture.java # screenshot the real ads as proof (headless Chrome)
+  input/DocumentImporter.java # read PDF/image job ads (pdftotext + tesseract OCR)
   image/SlideGenerator.java # render a clean slide per job (Java2D)
   audio/Narrator.java       # spoken voice-over per job (offline TTS)
-  video/VideoBuilder.java   # combine slides into mp4 via ffmpeg (+ mux narration)
+  audio/BackgroundMusic.java # synthesise a royalty-free music bed (ffmpeg)
+  video/VideoBuilder.java   # combine slides into mp4 via ffmpeg (+ mux narration + music)
   model/EvidenceItem.java   # one manifest entry of captured proof
 ```
 

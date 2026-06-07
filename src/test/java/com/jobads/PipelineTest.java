@@ -3,11 +3,13 @@ package com.jobads;
 import com.jobads.audio.Narrator;
 import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
+import com.jobads.input.DocumentImporter;
 import com.jobads.model.JobPosting;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -156,5 +158,57 @@ class PipelineTest {
         JobPosting rankList = new JobPosting();
         rankList.setTitle("കേരള പി.എസ്.സി. റാങ്ക് ലിസ്റ്റുകൾ");
         assertFalse(filter.isJobAd(rankList), "PSC rank list (not a job opening) should be dropped");
+    }
+
+    @Test
+    void importerParsesLabelledText() {
+        String text = String.join("\n",
+                "Title: Staff Nurse",
+                "Company: Government General Hospital",
+                "Location: Ernakulam",
+                "Qualification: B.Sc Nursing",
+                "Salary: Rs. 35,000 per month",
+                "Last date: 25-06-2026",
+                "How to apply: Apply online at the hospital portal",
+                "Contact: recruit@gghospital.gov.in");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("nurse.pdf"));
+        assertEquals("Staff Nurse", job.getTitle());
+        assertEquals("Government General Hospital", job.getCompany());
+        assertEquals("Ernakulam", job.getLocation());
+        assertEquals("B.Sc Nursing", job.getQualification());
+        assertEquals("25-06-2026", job.getLastDate());
+        assertEquals("recruit@gghospital.gov.in", job.getContact());
+        assertTrue(job.getApplyInfo().contains("Apply online"), "applyHow should be picked up");
+        assertTrue(job.getSource().contains("nurse.pdf"), "source should reference the file");
+    }
+
+    @Test
+    void importerFallsBackToFirstLineAndFindsDateAndEmail() {
+        // No explicit Title/Contact labels: title = first line, contact = email found in body,
+        // last date = date near the "last date" phrase.
+        String text = String.join("\n",
+                "Walk-in for Computer Operators",
+                "Some descriptive paragraph about the role.",
+                "The last date to apply is 30-06-2026.",
+                "Send CV to careers@firm.example");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("ad.png"));
+        assertEquals("Walk-in for Computer Operators", job.getTitle());
+        assertEquals("30-06-2026", job.getLastDate());
+        assertEquals("careers@firm.example", job.getContact());
+    }
+
+    @Test
+    void importerKeepsMalayalamValues() {
+        String text = String.join("\n",
+                "Title: ലാസ്റ്റ് ഗ്രേഡ് സർവന്റ് ഒഴിവ്",
+                "Company: കേരള പബ്ലിക് സർവീസ് കമ്മീഷൻ",
+                "Last date: 20-06-2026");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("ml.pdf"));
+        assertEquals("ലാസ്റ്റ് ഗ്രേഡ് സർവന്റ് ഒഴിവ്", job.getTitle());
+        assertTrue(Narrator.containsMalayalam(job.getTitle()), "title should retain Malayalam");
+        assertEquals("കേരള പബ്ലിക് സർവീസ് കമ്മീഷൻ", job.getCompany());
     }
 }
