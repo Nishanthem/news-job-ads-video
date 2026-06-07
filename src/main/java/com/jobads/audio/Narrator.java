@@ -16,8 +16,8 @@ import java.nio.file.Paths;
  * <p>No API keys are required. Engine preference:
  * <ol>
  *   <li><b>Piper</b> with an Indian-English neural voice ({@code en_IN-spicor-medium}) — natural
- *       Indian accent. The model must be present on disk; set {@code PIPER_MODEL} to override the
- *       search path.</li>
+ *       Indian accent. When a Malayalam voice ({@code ml_IN-meera-medium}) is also present, slides
+ *       containing Malayalam text are narrated with the Malayalam model automatically.</li>
  *   <li><b>espeak-ng</b> — lighter, robotic but reads numbers correctly.</li>
  *   <li><b>pico2wave</b> — SVOX Pico, smooth but reads numbers digit-by-digit and has no Indian
  *       accent.</li>
@@ -31,11 +31,12 @@ public class Narrator {
             "July", "August", "September", "October", "November", "December"
     };
 
-    private final String engine;    // "piper", "espeak-ng", "pico2wave", or null
-    private final String piperModel; // path to .onnx (only when engine == "piper")
+    private final String engine;      // "piper", "espeak-ng", "pico2wave", or null
+    private final String piperModel;   // path to English .onnx (only when engine == "piper")
+    private final String piperMlModel; // path to Malayalam .onnx, or null
 
     public Narrator() {
-        String model = findPiperModel();
+        String model = findPiperModel("en_IN-spicor-medium.onnx");
         if (model != null && commandExists("piper")) {
             this.engine = "piper";
             this.piperModel = model;
@@ -49,6 +50,13 @@ public class Narrator {
             this.engine = null;
             this.piperModel = null;
         }
+        // Look for a Malayalam voice model (optional — only used when Piper is the primary engine).
+        if ("piper".equals(this.engine)) {
+            String mlModel = findPiperModel("ml_IN-meera-medium.onnx");
+            this.piperMlModel = mlModel;
+        } else {
+            this.piperMlModel = null;
+        }
     }
 
     public boolean isAvailable() {
@@ -57,7 +65,12 @@ public class Narrator {
 
     public String engineName() {
         if (engine == null) return "none";
-        return "piper".equals(engine) ? "piper (en_IN-spicor, Indian English)" : engine;
+        if ("piper".equals(engine)) {
+            String desc = "piper (en_IN-spicor, Indian English";
+            if (piperMlModel != null) desc += " + ml_IN-meera, Malayalam";
+            return desc + ")";
+        }
+        return engine;
     }
 
     /** Build the spoken line for the intro card. */
@@ -130,8 +143,10 @@ public class Narrator {
         try {
             ProcessBuilder pb;
             if ("piper".equals(engine)) {
+                String model = (piperMlModel != null && containsMalayalam(text))
+                        ? piperMlModel : piperModel;
                 pb = new ProcessBuilder("piper",
-                        "--model", piperModel,
+                        "--model", model,
                         "--output_file", outWav.toAbsolutePath().toString());
                 pb.redirectErrorStream(true);
                 Process p = pb.start();
@@ -210,20 +225,37 @@ public class Narrator {
 
     // ---- engine detection ----
 
+    /** Return true when text contains at least one Malayalam Unicode character (U+0D00–U+0D7F). */
+    public static boolean containsMalayalam(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch >= 0x0D00 && ch <= 0x0D7F) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * Look for a Piper Indian-English voice model on disk. Check {@code PIPER_MODEL} env var first,
-     * then well-known locations.
+     * Look for a Piper voice model on disk. Check {@code PIPER_MODEL} env var first (for English),
+     * then well-known locations under {@code ~/piper-voices/}.
+     *
+     * @param filename the model file name, e.g. {@code "en_IN-spicor-medium.onnx"} or
+     *                 {@code "ml_IN-meera-medium.onnx"}.
      */
-    private static String findPiperModel() {
-        String envModel = System.getenv("PIPER_MODEL");
-        if (envModel != null && Files.isRegularFile(Paths.get(envModel))) {
-            return envModel;
+    private static String findPiperModel(String filename) {
+        // PIPER_MODEL env var is only honoured for the English model.
+        if ("en_IN-spicor-medium.onnx".equals(filename)) {
+            String envModel = System.getenv("PIPER_MODEL");
+            if (envModel != null && Files.isRegularFile(Paths.get(envModel))) {
+                return envModel;
+            }
         }
         String home = System.getProperty("user.home", "/home/ubuntu");
         String[] candidates = {
-                home + "/piper-voices/en_IN-spicor-medium.onnx",
-                home + "/.local/share/piper-voices/en_IN-spicor-medium.onnx",
-                "piper-voices/en_IN-spicor-medium.onnx",
+                home + "/piper-voices/" + filename,
+                home + "/.local/share/piper-voices/" + filename,
+                "piper-voices/" + filename,
         };
         for (String c : candidates) {
             if (Files.isRegularFile(Paths.get(c))) {

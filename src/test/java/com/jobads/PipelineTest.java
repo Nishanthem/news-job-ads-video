@@ -127,4 +127,34 @@ class PipelineTest {
         // Non dd/mm/yyyy values are passed through unchanged.
         assertEquals("Open until filled", Narrator.spokenDate("Open until filled"));
     }
+
+    @Test
+    void containsMalayalamDetectsScript() {
+        assertTrue(Narrator.containsMalayalam("ഒഴിവ് 133 vacancies"), "should detect Malayalam");
+        assertTrue(Narrator.containsMalayalam("Job 1. പി.എസ്.സി. വിജ്ഞാപനം"), "mixed text");
+        assertFalse(Narrator.containsMalayalam("Lead Consultant"), "pure English -> false");
+        assertFalse(Narrator.containsMalayalam(""), "empty -> false");
+    }
+
+    @Test
+    void filterKeepsMalayalamJobNotifications() {
+        JobFilter filter = new JobFilter();
+
+        JobPosting mlJob = new JobPosting();
+        mlJob.setTitle("സഹകരണസംഘത്തിൽ 133 ഒഴിവ്; അപേക്ഷ ക്ഷണിച്ചു");
+        assertTrue(filter.isJobAd(mlJob), "Malayalam job with ഒഴിവ should be kept");
+
+        JobPosting mlPsc = new JobPosting();
+        mlPsc.setTitle("16 കാറ്റഗറികളിൽ പി.എസ്.സി. വിജ്ഞാപനം");
+        assertTrue(filter.isJobAd(mlPsc), "PSC notification (വിജ്ഞാപനം) should be kept");
+
+        // Career advice articles and rank lists should be dropped.
+        JobPosting advice = new JobPosting();
+        advice.setTitle("സർക്കാർ ജോലിയിലേക്ക് എളുപ്പവഴി");
+        assertFalse(filter.isJobAd(advice), "career advice article should be dropped");
+
+        JobPosting rankList = new JobPosting();
+        rankList.setTitle("കേരള പി.എസ്.സി. റാങ്ക് ലിസ്റ്റുകൾ");
+        assertFalse(filter.isJobAd(rankList), "PSC rank list (not a job opening) should be dropped");
+    }
 }

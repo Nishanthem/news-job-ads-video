@@ -19,10 +19,10 @@
   },
   {
     "name": "Mathrubhumi Thozhil Vartha (mathrubhumi.com/careers)",
-    "url": "https://www.mathrubhumi.com/careers",
+    "url": "https://www.mathrubhumi.com/careers/thozhil-vartha",
     "itemSelector": "div.title-div",
     "titleSelector": "h2.teaser-head-text",
-    "linkSelector": "a[href*=/careers/news/]",
+    "linkSelector": "a[href*=/careers/]",
     "applyHow": "See the full notification on Mathrubhumi Thozhil Vartha (mathrubhumi.com/careers)"
   }
 ]

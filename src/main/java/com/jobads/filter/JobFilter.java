@@ -17,15 +17,15 @@ public class JobFilter {
             "position", "apply", "walk-in", "walk in", "required", "openings", "opening",
             "appointment", "employment", "career", "staff needed",
             // Malayalam roots so Malayalam-language sources (e.g. Mathrubhumi Thozhil Vartha) are kept.
-            // Case folding does not affect Malayalam, so these are matched as-is.
+            // Only strong "opening / notification" signals — broad terms like ജോലി (job) and
+            // പി.എസ്.സി (PSC) match career-advice articles and rank-list announcements too, so
+            // they are intentionally excluded.
             "ഒഴിവ",        // vacancy
-            "വിജ്ഞാപന",    // notification
+            "വിജ്ഞാപന",    // notification (job notification)
             "അപേക്ഷ",      // application / apply
             "നിയമന",       // appointment
             "റിക്രൂട്ട",     // recruitment
-            "തസ്തിക",       // post / position
-            "ജോലി",        // job
-            "പി.എസ്.സി"    // PSC (Public Service Commission)
+            "തസ്തിക"       // post / position
     };
 
     private static final String[] NOISE_KEYWORDS = {
