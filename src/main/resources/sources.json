@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Employment News (employmentnews.gov.in)",
+    "url": "https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All",
+    "itemSelector": "tr:has(span[id*=RepDetails_Label4_])",
+    "titleSelector": "span[id*=RepDetails_Label4_]",
+    "companySelector": "span[id*=RepDetails_Label3_]",
+    "lastDateSelector": "span[id*=RepDetails_Label6_]",
+    "applyHow": "Apply as per the official notification on employmentnews.gov.in"
+  },
+  {
+    "name": "Times Ascent (Times of India jobs)",
+    "url": "https://timesascent.com/jobs",
+    "itemSelector": "[class*=rounded-lg][class*=shadow-sm][class*=flex-1]",
+    "titleSelector": "h3[class*=text-title]",
+    "companySelector": "p[class*=text-small]",
+    "locationSelector": "div[class*=text-small][class*=text-black]",
+    "linkSelector": "a[href*=/jobs/posting-]"
+  },
+  {
+    "name": "Mathrubhumi Thozhil Vartha (mathrubhumi.com/careers)",
+    "url": "https://www.mathrubhumi.com/careers",
+    "itemSelector": "div.title-div",
+    "titleSelector": "h2.teaser-head-text",
+    "linkSelector": "a[href*=/careers/news/]",
+    "applyHow": "See the full notification on Mathrubhumi Thozhil Vartha (mathrubhumi.com/careers)"
+  }
+]
