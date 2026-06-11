@@ -139,10 +139,17 @@ java -jar target/news-job-ads-video.jar --input my-ads/ --out jobs.mp4 --brand "
   `Salary`, `Last date`, `How to apply`, `Contact`); otherwise it uses the first line as the title.
 - OCR is not perfect (especially Malayalam on scans) — review the extracted details before publishing.
 - `--input` can be combined with `--sources`; imported ads bypass the keyword filter.
+- **Source label:** imported files have no known source, so by default no source line is shown. Add a
+  `Source: <name>` line inside the document, or pass `--source-name "Times of India"` to label every
+  imported ad in the run.
+
+```bash
+java -jar target/news-job-ads-video.jar --input my-ads/ --source-name "Times of India" --out jobs.mp4
+```
 
 ### Background music
 
-A gentle, **royalty-free** background track plays quietly under the narration by default (it is
+A lively, **royalty-free** tabla groove plays quietly under the narration by default (it is
 synthesised from scratch with ffmpeg, so it is YouTube-safe). Override or disable it:
 
 ```bash
@@ -164,6 +171,7 @@ java -jar target/news-job-ads-video.jar --sample --no-music             # turn m
 | `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
 | `--no-evidence` | off | Skip capturing evidence screenshots |
 | `--input <path>` | – | A PDF/image file (or folder of them) to read job ads from |
+| `--source-name <text>` | – | Source label for imported jobs (e.g. the newspaper name); if omitted, no source is shown for imported files |
 | `--no-audio` | off | Skip the spoken narration (otherwise on when a TTS engine is available) |
 | `--music <file>` | synthesised bed | Background-music file looped quietly under the video |
 | `--no-music` | off | Disable background music |

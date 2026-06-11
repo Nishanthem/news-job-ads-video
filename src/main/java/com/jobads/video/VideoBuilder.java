@@ -197,7 +197,7 @@ public class VideoBuilder {
     }
 
     /** Background-music level relative to narration (kept low so speech stays clear). */
-    private static final double MUSIC_VOLUME = 0.10;
+    private static final double MUSIC_VOLUME = 0.55;
 
     /**
      * Mix a looped, low-volume music bed under a spoken track. The narration keeps full level; the

@@ -8,77 +8,81 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Generates a short, loopable, royalty-free background-music bed using {@code ffmpeg}'s sine
- * synthesiser. Because the audio is synthesised from scratch (a gentle four-chord pad), it is
- * free of any third-party copyright and therefore safe to publish on YouTube.
+ * Generates a short, loopable, royalty-free background-music bed using {@code ffmpeg}'s expression
+ * synthesiser ({@code aevalsrc}). Because the audio is synthesised from scratch, it is free of any
+ * third-party copyright and therefore safe to publish on YouTube.
  *
- * <p>The bed is intentionally soft and slow (a vi&ndash;IV&ndash;I&ndash;V progression: Am&ndash;F&ndash;C&ndash;G)
- * so it sits quietly under the narration. The caller loops and volume-ducks it to the final length;
- * users who want a richer track can instead supply their own file via {@code --music}.
+ * <p>The bed is a lively <strong>tabla</strong> groove: each stroke (bass {@code ge}, ringing
+ * {@code na}, sharp {@code tin}, and the combined {@code dha}) is approximated with decaying sine
+ * partials and the strokes are laid out on an eight-beat cycle. The caller loops and volume-ducks
+ * it under the narration; users who want a different track can instead supply their own file via
+ * {@code --music}.
  */
 public final class BackgroundMusic {
 
     private BackgroundMusic() {
     }
 
-    /** One chord = three harmonious sine frequencies (Hz). */
-    private static final double[][] CHORDS = {
-            {220.00, 261.63, 329.63}, // A minor
-            {174.61, 220.00, 261.63}, // F major
-            {261.63, 329.63, 392.00}, // C major
-            {196.00, 246.94, 293.66}, // G major
-    };
+    /** Tabla stroke expressions (functions of time {@code t}, one drum hit each). */
+    private static final String GE  = "0.95*exp(-13*t)*sin(2*PI*90*t)";
+    private static final String NA  = "0.55*exp(-6*t)*sin(2*PI*330*t)+0.22*exp(-9*t)*sin(2*PI*742*t)";
+    private static final String TIN = "0.5*exp(-10*t)*sin(2*PI*500*t)+0.18*exp(-12*t)*sin(2*PI*1000*t)";
+    private static final String DHA = "0.9*exp(-12*t)*sin(2*PI*92*t)+0.5*exp(-6*t)*sin(2*PI*330*t)"
+            + "+0.2*exp(-9*t)*sin(2*PI*742*t)";
 
-    private static final double CHORD_SECONDS = 4.0;
-    private static final double FADE_SECONDS = 0.6;
+    /** The eight-beat tabla cycle (Keherwa-style groove). */
+    private static final String[] PATTERN = {DHA, GE, NA, TIN, NA, GE, DHA, NA};
+
+    /** Milliseconds between strokes (300 ms ~ a brisk, danceable tabla tempo). */
+    private static final int BEAT_MS = 300;
+    /** How long each synthesised stroke is allowed to ring. */
+    private static final double STROKE_SECONDS = 0.45;
+    /** Overall loop gain, calibrated so the ducked bed is audible but well under the narration. */
+    private static final double LOOP_VOLUME = 0.30;
 
     /**
-     * Synthesise the default ambient loop (~16s) into {@code dir/bg-music-loop.wav}.
+     * Synthesise the default tabla loop into {@code dir/bg-music-loop.wav}.
      *
      * @return the generated loop path, or {@code null} if synthesis failed (caller continues
      *         without music).
      */
     public static Path generateDefaultLoop(Path dir) {
         Path out = dir.resolve("bg-music-loop.wav");
+        double loopSeconds = (PATTERN.length * BEAT_MS) / 1000.0;
+
         List<String> cmd = new ArrayList<>();
         cmd.add("ffmpeg");
         cmd.add("-y");
 
-        // One lavfi sine input per note across all chords.
-        for (double[] chord : CHORDS) {
-            for (double freq : chord) {
-                cmd.add("-f");
-                cmd.add("lavfi");
-                cmd.add("-i");
-                cmd.add(String.format(Locale.US,
-                        "sine=frequency=%.2f:sample_rate=44100:duration=%.2f", freq, CHORD_SECONDS));
-            }
+        // One aevalsrc input per stroke in the cycle.
+        for (String stroke : PATTERN) {
+            cmd.add("-f");
+            cmd.add("lavfi");
+            cmd.add("-i");
+            cmd.add(String.format(Locale.US, "aevalsrc=%s:d=%.2f:s=44100", stroke, STROKE_SECONDS));
         }
 
+        // Delay each stroke to its beat position, then mix and level.
         StringBuilder fc = new StringBuilder();
-        int idx = 0;
-        double fadeOutStart = CHORD_SECONDS - FADE_SECONDS;
-        for (int c = 0; c < CHORDS.length; c++) {
-            fc.append('[').append(idx++).append(']')
-              .append('[').append(idx++).append(']')
-              .append('[').append(idx++).append(']')
-              .append("amix=inputs=3:normalize=0,")
-              .append("volume=0.22,")
-              .append(String.format(Locale.US, "afade=t=in:st=0:d=%.2f,", FADE_SECONDS))
-              .append(String.format(Locale.US, "afade=t=out:st=%.2f:d=%.2f", fadeOutStart, FADE_SECONDS))
-              .append("[c").append(c).append("];");
+        for (int i = 0; i < PATTERN.length; i++) {
+            int delay = i * BEAT_MS;
+            fc.append('[').append(i).append(']')
+              .append("adelay=").append(delay).append('|').append(delay)
+              .append("[a").append(i).append("];");
         }
-        for (int c = 0; c < CHORDS.length; c++) {
-            fc.append("[c").append(c).append(']');
+        for (int i = 0; i < PATTERN.length; i++) {
+            fc.append("[a").append(i).append(']');
         }
-        fc.append("concat=n=").append(CHORDS.length).append(":v=0:a=1,")
-          .append("lowpass=f=1100,")
+        fc.append("amix=inputs=").append(PATTERN.length).append(":normalize=0:duration=longest,")
+          .append(String.format(Locale.US, "volume=%.2f,", LOOP_VOLUME))
           .append("aformat=sample_rates=44100:channel_layouts=stereo[out]");
 
         cmd.add("-filter_complex");
         cmd.add(fc.toString());
         cmd.add("-map");
         cmd.add("[out]");
+        cmd.add("-t");
+        cmd.add(String.format(Locale.US, "%.2f", loopSeconds));
         cmd.add(out.toAbsolutePath().toString());
 
         try {

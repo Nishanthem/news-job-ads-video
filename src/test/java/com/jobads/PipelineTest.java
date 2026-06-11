@@ -180,7 +180,24 @@ class PipelineTest {
         assertEquals("25-06-2026", job.getLastDate());
         assertEquals("recruit@gghospital.gov.in", job.getContact());
         assertTrue(job.getApplyInfo().contains("Apply online"), "applyHow should be picked up");
-        assertTrue(job.getSource().contains("nurse.pdf"), "source should reference the file");
+        // No source is fabricated for imported files when none is known.
+        assertTrue(job.getSource() == null || job.getSource().isBlank(),
+                "source should be blank when not provided");
+    }
+
+    @Test
+    void importerUsesSourceLineThenSourceNameFallback() {
+        // A "Source:" line in the document wins.
+        String withSource = String.join("\n",
+                "Title: Lab Technician",
+                "Source: Malayala Manorama");
+        JobPosting a = new DocumentImporter("eng", "Fallback Daily").parse(withSource, Paths.get("a.pdf"));
+        assertEquals("Malayala Manorama", a.getSource());
+
+        // Without a Source line, the run-wide source name is used.
+        String noSource = "Title: Lab Technician";
+        JobPosting b = new DocumentImporter("eng", "Fallback Daily").parse(noSource, Paths.get("b.pdf"));
+        assertEquals("Fallback Daily", b.getSource());
     }
 
     @Test

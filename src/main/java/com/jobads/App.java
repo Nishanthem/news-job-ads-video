@@ -36,6 +36,8 @@ import java.util.Map;
  *     --sample              use bundled sample-jobs.json instead of scraping (default if no sources)
  *     --sources &lt;file&gt;      path to a sources.json describing sites to scrape
  *     --input &lt;path&gt;        a PDF/image file (or a folder of them) to read job ads from
+ *     --source-name &lt;text&gt;  source label for imported jobs (e.g. the newspaper name); if omitted,
+ *                            no source is shown for imported files
  *     --out &lt;file&gt;          output video path (default: jobs.mp4)
  *     --brand &lt;text&gt;        brand/title shown in the header (default: "Job Alerts")
  *     --seconds &lt;n&gt;         seconds each slide is shown (default: 5)
@@ -109,7 +111,9 @@ public class App {
                 Path inputPath = Paths.get(opts.get("input"));
                 System.out.println("[app] importing job ads from PDF/image input: " + inputPath);
                 try {
-                    List<JobPosting> imported = new DocumentImporter().importPath(inputPath);
+                    String sourceName = opts.get("source-name");
+                    List<JobPosting> imported =
+                            new DocumentImporter("eng+mal", sourceName).importPath(inputPath);
                     System.out.println("[app] imported " + imported.size()
                             + " job ad(s) from documents.");
                     jobs.addAll(imported);

@@ -42,12 +42,23 @@ public class DocumentImporter {
     /** OCR languages passed to tesseract; English + Malayalam. */
     private final String ocrLanguages;
 
+    /**
+     * Source label to stamp on imported jobs (e.g. the newspaper name) when the document itself
+     * does not carry a {@code Source:} line. {@code null}/blank means no source is shown.
+     */
+    private final String sourceName;
+
     public DocumentImporter() {
-        this("eng+mal");
+        this("eng+mal", null);
     }
 
     public DocumentImporter(String ocrLanguages) {
+        this(ocrLanguages, null);
+    }
+
+    public DocumentImporter(String ocrLanguages, String sourceName) {
         this.ocrLanguages = ocrLanguages;
+        this.sourceName = sourceName;
     }
 
     /**
@@ -167,7 +178,6 @@ public class DocumentImporter {
      */
     public JobPosting parse(String text, Path file) {
         JobPosting job = new JobPosting();
-        job.setSource("Imported document (" + file.getFileName() + ")");
 
         List<String> lines = new ArrayList<>();
         for (String raw : text.split("\\R")) {
@@ -231,6 +241,12 @@ public class DocumentImporter {
                 }
             }
         }
+
+        // Source: prefer a "Source:" line from the document, else the run-wide source name, else
+        // leave it blank (so the slide/narration omit the source rather than showing a placeholder).
+        if (isBlank(job.getSource()) && !isBlank(sourceName)) {
+            job.setSource(sourceName.trim());
+        }
         return job;
     }
 
@@ -273,6 +289,10 @@ public class DocumentImporter {
                 "to apply", "how to register")) {
             if (isBlank(job.getApplyHow())) {
                 job.setApplyHow(value);
+            }
+        } else if (matches(label, "source", "published in", "newspaper", "portal", "publication")) {
+            if (isBlank(job.getSource())) {
+                job.setSource(value);
             }
         }
     }
