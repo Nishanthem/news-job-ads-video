@@ -17,7 +17,7 @@ public class JobFilter {
             "position", "apply", "walk-in", "walk in", "required", "openings", "opening",
             "appointment", "employment", "career", "staff needed",
             "online form", "last date", "admit card", "notification",
-            "sarkari", "bharti", "post", "posts",
+            "sarkari", "bharti", "posts",
             // Hindi keywords for government job portals (SarkariResult, FreeJobAlert, etc.)
             "भर्ती",         // bharti (recruitment)
             "नौकरी",        // naukri (job)
