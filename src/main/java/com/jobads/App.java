@@ -67,7 +67,7 @@ public class App {
         Map<String, String> opts = parseArgs(args);
         boolean useSample = opts.containsKey("sample") || !opts.containsKey("sources");
 
-        String brand = opts.getOrDefault("brand", "Job Alerts");
+        String brand = opts.getOrDefault("brand", "RightRoads Job News");
         Path output = Paths.get(opts.getOrDefault("out", "jobs.mp4"));
         int seconds = Integer.parseInt(opts.getOrDefault("seconds", "5"));
         int fps = Integer.parseInt(opts.getOrDefault("fps", "25"));
