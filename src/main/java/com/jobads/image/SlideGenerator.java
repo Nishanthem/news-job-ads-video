@@ -134,6 +134,7 @@ public class SlideGenerator {
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);
         y = detail(g, "Last Date", job.getLastDate(), y);
+        y = detail(g, "Contact", job.getContact(), y);
         // Show the direct apply link when available.
         y = detail(g, "Apply Link", job.getLink(), y, ACCENT);
 
