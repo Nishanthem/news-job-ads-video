@@ -38,7 +38,7 @@ public class SlideGenerator {
     private final String brand;
 
     public SlideGenerator(String brand) {
-        this.brand = brand == null ? "Job Alerts" : brand;
+        this.brand = brand == null ? "RightRoads Job News" : brand;
     }
 
     /**
@@ -134,8 +134,9 @@ public class SlideGenerator {
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);
         y = detail(g, "Last Date", job.getLastDate(), y);
-        // "How to Apply" highlighted so the viewer always knows the next step.
-        y = detail(g, "How to Apply", job.getApplyInfo(), y, ACCENT);
+        y = detail(g, "Contact", job.getContact(), y);
+        // Show the direct apply link when available.
+        y = detail(g, "Apply Link", job.getLink(), y, ACCENT);
 
         // Footer / source attribution
         g.setColor(MUTED);

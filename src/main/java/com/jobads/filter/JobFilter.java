@@ -16,6 +16,18 @@ public class JobFilter {
             "hiring", "vacancy", "vacancies", "wanted", "recruitment", "recruit", "job", "jobs",
             "position", "apply", "walk-in", "walk in", "required", "openings", "opening",
             "appointment", "employment", "career", "staff needed",
+            "online form", "last date", "admit card", "notification",
+            "sarkari", "bharti", "posts",
+            // Hindi keywords for government job portals (SarkariResult, FreeJobAlert, etc.)
+            "भर्ती",         // bharti (recruitment)
+            "नौकरी",        // naukri (job)
+            "रिक्ति",        // rikti (vacancy)
+            "आवेदन",        // aavedan (application)
+            "पद",           // pad (post/position)
+            "नियुक्ति",      // niyukti (appointment)
+            "रोजगार",       // rojgar (employment)
+            "सरकारी",       // sarkari (government)
+            "परीक्षा",       // pariksha (exam)
             // Malayalam roots so Malayalam-language sources (e.g. Mathrubhumi Thozhil Vartha) are kept.
             // Case folding does not affect Malayalam, so these are matched as-is.
             "ഒഴിവ",        // vacancy
@@ -30,7 +42,8 @@ public class JobFilter {
 
     private static final String[] NOISE_KEYWORDS = {
             "subscribe", "advertise with us", "privacy policy", "cookie", "sign in", "log in",
-            "terms of service", "newsletter"
+            "terms of service", "newsletter", "terms and conditions", "skip to content",
+            "disclaimer", "powered by", "copyright"
     };
 
     /**

@@ -41,6 +41,9 @@ import java.util.Map;
  *     --evidence &lt;dir&gt;      directory to save proof-of-source evidence (default: &lt;out&gt;/evidence)
  *     --no-evidence         skip capturing evidence screenshots
  *     --no-audio            skip spoken narration (otherwise on when a TTS engine is available)
+ *     --bgm &lt;file&gt;          path to an MP3/WAV background music file (looped under narration)
+ *     --bgm-default         generate a simple ambient BGM automatically (no file needed)
+ *     --bgm-volume &lt;0.0-1.0&gt; background music volume relative to narration (default: 0.15)
  *     --disclaimer &lt;text&gt;   custom disclaimer shown/narrated after the intro (has a default)
  *     --no-disclaimer       omit the disclaimer card
  * </pre>
@@ -64,7 +67,7 @@ public class App {
         Map<String, String> opts = parseArgs(args);
         boolean useSample = opts.containsKey("sample") || !opts.containsKey("sources");
 
-        String brand = opts.getOrDefault("brand", "Job Alerts");
+        String brand = opts.getOrDefault("brand", "RightRoads Job News");
         Path output = Paths.get(opts.getOrDefault("out", "jobs.mp4"));
         int seconds = Integer.parseInt(opts.getOrDefault("seconds", "5"));
         int fps = Integer.parseInt(opts.getOrDefault("fps", "25"));
@@ -135,6 +138,28 @@ public class App {
 
         VideoBuilder videoBuilder = new VideoBuilder(seconds, fps);
         boolean wantAudio = !opts.containsKey("no-audio");
+
+        Path bgmPath = null;
+        if (opts.containsKey("bgm")) {
+            bgmPath = Paths.get(opts.get("bgm"));
+            if (!Files.isRegularFile(bgmPath)) {
+                System.err.println("[app] WARNING: --bgm file not found: " + bgmPath + "; skipping BGM.");
+                bgmPath = null;
+            }
+        } else if (opts.containsKey("bgm-default")) {
+            try {
+                System.out.println("[app] generating default background music...");
+                bgmPath = VideoBuilder.generateDefaultBgm(workDir);
+            } catch (Exception e) {
+                System.err.println("[app] failed to generate default BGM (continuing without it): "
+                        + e.getMessage());
+            }
+        }
+        if (bgmPath != null) {
+            double bgmVol = Double.parseDouble(opts.getOrDefault("bgm-volume", "0.15"));
+            videoBuilder.setBgm(bgmPath, bgmVol);
+            System.out.println("[app] background music enabled (volume: " + bgmVol + ")");
+        }
 
         if (wantAudio && narrator.isAvailable()) {
             System.out.println("[app] generating narration with " + narrator.engineName()

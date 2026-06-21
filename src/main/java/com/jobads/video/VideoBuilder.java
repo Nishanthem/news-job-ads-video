@@ -16,10 +16,17 @@ public class VideoBuilder {
 
     private final int secondsPerSlide;
     private final int fps;
+    private Path bgmPath;
+    private double bgmVolume = 0.15;
 
     public VideoBuilder(int secondsPerSlide, int fps) {
         this.secondsPerSlide = secondsPerSlide;
         this.fps = fps;
+    }
+
+    public void setBgm(Path bgmPath, double volume) {
+        this.bgmPath = bgmPath;
+        this.bgmVolume = Math.max(0.0, Math.min(1.0, volume));
     }
 
     /**
@@ -49,30 +56,46 @@ public class VideoBuilder {
         sb.append("file '").append(slides.get(slides.size() - 1).toAbsolutePath()).append("'\n");
         Files.writeString(listFile, sb.toString(), StandardCharsets.UTF_8);
 
-        List<String> cmd = new ArrayList<>();
-        cmd.add("ffmpeg");
-        cmd.add("-y");
-        cmd.add("-f");
-        cmd.add("concat");
-        cmd.add("-safe");
-        cmd.add("0");
-        cmd.add("-i");
-        cmd.add(listFile.toAbsolutePath().toString());
-        cmd.add("-vf");
-        cmd.add("fps=" + fps + ",format=yuv420p");
-        cmd.add("-movflags");
-        cmd.add("+faststart");
-        cmd.add(output.toAbsolutePath().toString());
+        if (bgmPath != null && Files.isRegularFile(bgmPath)) {
+            double totalDur = (double) slides.size() * secondsPerSlide;
+            List<String> cmd = new ArrayList<>();
+            cmd.addAll(List.of("ffmpeg", "-y",
+                    "-f", "concat", "-safe", "0", "-i", listFile.toAbsolutePath().toString(),
+                    "-stream_loop", "-1", "-i", bgmPath.toAbsolutePath().toString(),
+                    "-vf", "fps=" + fps + ",format=yuv420p",
+                    "-filter_complex", "[1:a]volume=" + fmt(bgmVolume) + "[bgm]",
+                    "-map", "0:v", "-map", "[bgm]",
+                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
+                    "-t", fmt(totalDur),
+                    "-movflags", "+faststart",
+                    output.toAbsolutePath().toString()));
+            runFfmpeg2(cmd, listFile);
+        } else {
+            List<String> cmd = new ArrayList<>();
+            cmd.add("ffmpeg");
+            cmd.add("-y");
+            cmd.add("-f");
+            cmd.add("concat");
+            cmd.add("-safe");
+            cmd.add("0");
+            cmd.add("-i");
+            cmd.add(listFile.toAbsolutePath().toString());
+            cmd.add("-vf");
+            cmd.add("fps=" + fps + ",format=yuv420p");
+            cmd.add("-movflags");
+            cmd.add("+faststart");
+            cmd.add(output.toAbsolutePath().toString());
 
-        Process process = new ProcessBuilder(cmd)
-                .redirectErrorStream(true)
-                .start();
-        String log = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        int exit = process.waitFor();
-        Files.deleteIfExists(listFile);
+            Process process = new ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .start();
+            String log = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exit = process.waitFor();
+            Files.deleteIfExists(listFile);
 
-        if (exit != 0) {
-            throw new IOException("ffmpeg failed (exit " + exit + "):\n" + log);
+            if (exit != 0) {
+                throw new IOException("ffmpeg failed (exit " + exit + "):\n" + log);
+            }
         }
         return output;
     }
@@ -150,13 +173,30 @@ public class VideoBuilder {
         isb.append("file '").append(slides.get(slides.size() - 1).toAbsolutePath()).append("'\n");
         Files.writeString(imageList, isb.toString(), StandardCharsets.UTF_8);
 
-        runFfmpeg(List.of("-y",
-                "-f", "concat", "-safe", "0", "-i", imageList.toAbsolutePath().toString(),
-                "-i", combinedAudio.toAbsolutePath().toString(),
-                "-vf", "fps=" + fps + ",format=yuv420p",
-                "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
-                "-movflags", "+faststart", "-shortest",
-                output.toAbsolutePath().toString()));
+        if (bgmPath != null && Files.isRegularFile(bgmPath)) {
+            double totalDur = durations.stream().mapToDouble(Double::doubleValue).sum();
+            runFfmpeg(List.of("-y",
+                    "-f", "concat", "-safe", "0", "-i", imageList.toAbsolutePath().toString(),
+                    "-i", combinedAudio.toAbsolutePath().toString(),
+                    "-stream_loop", "-1", "-i", bgmPath.toAbsolutePath().toString(),
+                    "-filter_complex",
+                    "[1:a]volume=1.0[voice];[2:a]volume=" + fmt(bgmVolume) + "[bgm];"
+                            + "[voice][bgm]amix=inputs=2:duration=first[aout]",
+                    "-vf", "fps=" + fps + ",format=yuv420p",
+                    "-map", "0:v", "-map", "[aout]",
+                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
+                    "-t", fmt(totalDur),
+                    "-movflags", "+faststart",
+                    output.toAbsolutePath().toString()));
+        } else {
+            runFfmpeg(List.of("-y",
+                    "-f", "concat", "-safe", "0", "-i", imageList.toAbsolutePath().toString(),
+                    "-i", combinedAudio.toAbsolutePath().toString(),
+                    "-vf", "fps=" + fps + ",format=yuv420p",
+                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart", "-shortest",
+                    output.toAbsolutePath().toString()));
+        }
 
         deleteQuietly(tmpDir);
         return output;
@@ -194,6 +234,47 @@ public class VideoBuilder {
         if (p.waitFor() != 0) {
             throw new IOException("ffmpeg failed:\n" + log);
         }
+    }
+
+    private static void runFfmpeg2(List<String> fullCmd, Path cleanup)
+            throws IOException, InterruptedException {
+        Process p = new ProcessBuilder(fullCmd).redirectErrorStream(true).start();
+        String log = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exit = p.waitFor();
+        if (cleanup != null) Files.deleteIfExists(cleanup);
+        if (exit != 0) {
+            throw new IOException("ffmpeg failed (exit " + exit + "):\n" + log);
+        }
+    }
+
+    /**
+     * Generate a simple ambient background music track using ffmpeg's audio synthesis.
+     * Produces a gentle pad sound suitable for playing behind narration.
+     */
+    public static Path generateDefaultBgm(Path outputDir) throws IOException, InterruptedException {
+        Path bgm = outputDir.resolve("default-bgm.mp3");
+        List<String> cmd = new ArrayList<>();
+        cmd.add("ffmpeg");
+        cmd.addAll(List.of("-y", "-f", "lavfi", "-i",
+                "sine=frequency=220:duration=10,volume=0.3"
+                        + ",aecho=0.8:0.88:60:0.4"
+                        + ",lowpass=f=800"
+                        + ",highpass=f=100",
+                "-f", "lavfi", "-i",
+                "sine=frequency=330:duration=10,volume=0.15"
+                        + ",aecho=0.8:0.9:80:0.3"
+                        + ",lowpass=f=1000",
+                "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=longest[out]",
+                "-map", "[out]",
+                "-t", "10",
+                "-c:a", "libmp3lame", "-b:a", "128k",
+                bgm.toAbsolutePath().toString()));
+        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        String log = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (p.waitFor() != 0) {
+            throw new IOException("Failed to generate default BGM:\n" + log);
+        }
+        return bgm;
     }
 
     private static void deleteQuietly(Path dir) {
