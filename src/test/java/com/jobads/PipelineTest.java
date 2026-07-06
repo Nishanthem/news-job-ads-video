@@ -5,7 +5,10 @@ import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
 import com.jobads.input.DocumentImporter;
 import com.jobads.model.JobPosting;
+import com.jobads.scraper.EmploymentNewsAds;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -214,6 +217,28 @@ class PipelineTest {
         assertEquals("Walk-in for Computer Operators", job.getTitle());
         assertEquals("30-06-2026", job.getLastDate());
         assertEquals("careers@firm.example", job.getContact());
+    }
+
+    @Test
+    void employmentNewsCleansOrgLabel() {
+        assertEquals("ALLAHABAD MUSEUM",
+                EmploymentNewsAds.cleanOrg("ALLAHABAD MUSEUM ( Issue no 14 , 04 - 10 July 2026 )"));
+        assertEquals("RAMAN RESEARCH INSTITUTE",
+                EmploymentNewsAds.cleanOrg("RAMAN RESEARCH INSTITUTE"));
+    }
+
+    @Test
+    void employmentNewsExtractsPositionFromNotificationText() {
+        String ndma = "National Disaster Management Authority. Advertisement for the position of "
+                + "Senior Consultant (Mitigation of Floods) in NDMA on contract basis.";
+        assertEquals("Senior Consultant", EmploymentNewsAds.extractPosition(ndma));
+
+        String museum = "Allahabad Museum invites applications for the post of "
+                + "Finance-cum-Accounts Officer (Number of Post- 01).";
+        assertEquals("Finance-cum-Accounts Officer", EmploymentNewsAds.extractPosition(museum));
+
+        // OCR gibberish / no recognisable position -> null (caller falls back to the org name).
+        assertNull(EmploymentNewsAds.extractPosition("Tella Tet wets fears fagafaenrcra"));
     }
 
     @Test

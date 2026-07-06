@@ -7,6 +7,7 @@ import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
 import com.jobads.input.DocumentImporter;
 import com.jobads.model.JobPosting;
+import com.jobads.scraper.EmploymentNewsAds;
 import com.jobads.scraper.EvidenceCapture;
 import com.jobads.scraper.JobScraper;
 import com.jobads.scraper.SiteConfig;
@@ -36,6 +37,9 @@ import java.util.Map;
  *     --sample              use bundled sample-jobs.json instead of scraping (default if no sources)
  *     --sources &lt;file&gt;      path to a sources.json describing sites to scrape
  *     --input &lt;path&gt;        a PDF/image file (or a folder of them) to read job ads from
+ *     --employment-news     also pull ads from the official Employment News "Web Advertisement"
+ *                            page (downloads &amp; OCRs the free notification PDFs)
+ *     --en-limit &lt;n&gt;        max Employment News PDFs to OCR per run (default: 12)
  *     --source-name &lt;text&gt;  source label for imported jobs (e.g. the newspaper name); if omitted,
  *                            no source is shown for imported files
  *     --out &lt;file&gt;          output video path (default: jobs.mp4)
@@ -71,7 +75,9 @@ public class App {
         Map<String, String> opts = parseArgs(args);
         boolean hasSources = opts.containsKey("sources");
         boolean hasInput = opts.containsKey("input");
-        boolean useSample = opts.containsKey("sample") || (!hasSources && !hasInput);
+        boolean hasEmploymentNews = opts.containsKey("employment-news");
+        boolean useSample = opts.containsKey("sample")
+                || (!hasSources && !hasInput && !hasEmploymentNews);
 
         String brand = opts.getOrDefault("brand", "Job Alerts");
         Path output = Paths.get(opts.getOrDefault("out", "jobs.mp4"));
@@ -105,6 +111,19 @@ public class App {
                         System.err.println("[app] evidence capture failed (continuing without it): "
                                 + e.getMessage());
                     }
+                }
+            }
+            if (hasEmploymentNews) {
+                int enMax = Integer.parseInt(opts.getOrDefault("en-limit", "12"));
+                System.out.println("[app] collecting Employment News web advertisements "
+                        + "(official free notification PDFs, OCR'd)");
+                try {
+                    List<JobPosting> enJobs = new EmploymentNewsAds().collect(enMax);
+                    System.out.println("[app] collected " + enJobs.size()
+                            + " Employment News ad(s).");
+                    jobs.addAll(enJobs);
+                } catch (Exception e) {
+                    System.err.println("[app] Employment News collection failed: " + e.getMessage());
                 }
             }
             if (hasInput) {

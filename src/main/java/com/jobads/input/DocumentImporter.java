@@ -114,6 +114,11 @@ public class DocumentImporter {
         return false;
     }
 
+    /** Publicly extract raw text from a single PDF/image (PDF text layer, else OCR). */
+    public String readText(Path file) throws IOException {
+        return extractText(file);
+    }
+
     /** Extract raw text from a single PDF or image file. */
     String extractText(Path file) throws IOException {
         String name = file.getFileName().toString().toLowerCase(Locale.ROOT);

@@ -147,6 +147,27 @@ java -jar target/news-job-ads-video.jar --input my-ads/ --out jobs.mp4 --brand "
 java -jar target/news-job-ads-video.jar --input my-ads/ --source-name "Times of India" --out jobs.mp4
 ```
 
+### 4. Pull ads from Employment News (official free notification PDFs)
+
+The Government of India's **Employment News** publishes a free ["Web Advertisement"](https://employmentnews.gov.in/NewEmp/MoreContentS.aspx?n=WebAdvertisement)
+page listing ~50 current recruitment ads per week, each linking to an official notification PDF. The
+full weekly e-paper is a paid subscription, but these individual advertisement PDFs are public.
+
+```bash
+java -jar target/news-job-ads-video.jar --employment-news --brand "Government Job Alerts" --out gov-jobs.mp4
+```
+
+- The listing gives a clean organisation name; the linked PDF is downloaded and (since these are
+  scans with no text layer) **OCR'd** to pull the position title and last date.
+- The headline is the extracted position when one is found (e.g. *"Finance-cum-Accounts Officer"*),
+  otherwise the organisation name; `Source: Employment News` is shown on every slide.
+- OCR of ~50 PDFs is slow, so it is capped with `--en-limit <n>` (default `12`).
+- Combine with `--sources` and/or `--input` to mix these ads with scraped/imported ones.
+
+```bash
+java -jar target/news-job-ads-video.jar --employment-news --en-limit 25 --out gov-jobs.mp4
+```
+
 ### Background music
 
 A lively, **royalty-free** tabla groove plays quietly under the narration by default (it is
@@ -171,6 +192,8 @@ java -jar target/news-job-ads-video.jar --sample --no-music             # turn m
 | `--evidence <dir>` | `<out>/evidence` | Where to save proof-of-source evidence |
 | `--no-evidence` | off | Skip capturing evidence screenshots |
 | `--input <path>` | – | A PDF/image file (or folder of them) to read job ads from |
+| `--employment-news` | off | Also pull ads from the official Employment News "Web Advertisement" page (downloads & OCRs the free notification PDFs) |
+| `--en-limit <n>` | `12` | Max Employment News PDFs to OCR per run |
 | `--source-name <text>` | – | Source label for imported jobs (e.g. the newspaper name); if omitted, no source is shown for imported files |
 | `--no-audio` | off | Skip the spoken narration (otherwise on when a TTS engine is available) |
 | `--music <file>` | synthesised bed | Background-music file looped quietly under the video |
