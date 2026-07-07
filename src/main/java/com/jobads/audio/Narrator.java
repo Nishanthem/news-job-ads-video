@@ -90,6 +90,9 @@ public class Narrator {
         if (notBlank(job.getCompany())) {
             sb.append("Organisation, ").append(sanitize(job.getCompany())).append(". ");
         }
+        if (notBlank(job.getOpenings())) {
+            sb.append("Number of openings, ").append(sanitize(job.getOpenings())).append(". ");
+        }
         if (notBlank(job.getLocation())) {
             sb.append("Location, ").append(sanitize(job.getLocation())).append(". ");
         }

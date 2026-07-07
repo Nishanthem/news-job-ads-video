@@ -247,6 +247,13 @@ public class DocumentImporter {
             }
         }
 
+        if (isBlank(job.getOpenings())) {
+            String n = AdTextExtractor.numberOfPosts(text);
+            if (!n.isBlank()) {
+                job.setOpenings(n);
+            }
+        }
+
         // Source: prefer a "Source:" line from the document, else the run-wide source name, else
         // leave it blank (so the slide/narration omit the source rather than showing a placeholder).
         if (isBlank(job.getSource()) && !isBlank(sourceName)) {
@@ -289,6 +296,13 @@ public class DocumentImporter {
                 "apply before", "last date of application", "last date for application")) {
             if (isBlank(job.getLastDate())) {
                 job.setLastDate(value);
+            }
+        } else if (matches(label, "no of posts", "no. of posts", "number of posts", "total posts",
+                "no of vacancies", "no. of vacancies", "number of vacancies", "vacancies",
+                "openings", "no of positions", "number of positions")) {
+            if (isBlank(job.getOpenings())) {
+                String n = AdTextExtractor.numberOfPosts(label + ": " + value);
+                job.setOpenings(!n.isBlank() ? n : trimTo(value, 40));
             }
         } else if (matches(label, "how to apply", "apply", "application", "mode of apply",
                 "to apply", "how to register")) {

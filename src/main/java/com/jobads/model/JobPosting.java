@@ -20,6 +20,8 @@ public class JobPosting {
     private String lastDate;
     private String source;
     private String link;
+    /** Number of vacancies/posts advertised, when known (e.g. "05" or "12 posts"). */
+    private String openings;
     /** Explicit "how to apply" instruction, when the source provides one. */
     private String applyHow;
 
@@ -110,6 +112,14 @@ public class JobPosting {
 
     public void setLink(String link) {
         this.link = link;
+    }
+
+    public String getOpenings() {
+        return openings;
+    }
+
+    public void setOpenings(String openings) {
+        this.openings = openings;
     }
 
     public String getApplyHow() {

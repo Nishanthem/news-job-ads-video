@@ -14,6 +14,39 @@ public final class AdTextExtractor {
     private AdTextExtractor() {
     }
 
+    /**
+     * Number of vacancies/posts advertised, when clearly stated (e.g. "No. of Posts: 05",
+     * "Number of vacancies - 12", "Total posts: 3"). Returns the count as a string, or "" when not
+     * confidently found. Values above 9999 are ignored as OCR noise.
+     */
+    public static String numberOfPosts(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String flat = text.replaceAll("\\s+", " ");
+        Pattern[] patterns = {
+            Pattern.compile("(?i)(?:total\\s+)?(?:number|no\\.?)\\s+of\\s+(?:posts?|vacanc\\w*|"
+                    + "positions?)\\s*[:\\-–]?\\s*(\\d{1,4})"),
+            Pattern.compile("(?i)(?:no\\.?\\s+of\\s+)?(?:posts?|vacanc\\w*|positions?)\\s*[:\\-–]"
+                    + "\\s*(\\d{1,4})\\b"),
+            Pattern.compile("(?i)\\b(\\d{1,4})\\s+(?:posts?|vacanc\\w*|positions?)\\b")
+        };
+        for (Pattern p : patterns) {
+            Matcher m = p.matcher(flat);
+            if (m.find()) {
+                try {
+                    int n = Integer.parseInt(m.group(1));
+                    if (n >= 1 && n <= 9999) {
+                        return String.valueOf(n);
+                    }
+                } catch (NumberFormatException ignore) {
+                    // fall through
+                }
+            }
+        }
+        return "";
+    }
+
     /** e.g. "Apply online", "Apply by post", "Apply by email", or "" when unclear. */
     public static String applyMode(String text) {
         if (text == null || text.isBlank()) {

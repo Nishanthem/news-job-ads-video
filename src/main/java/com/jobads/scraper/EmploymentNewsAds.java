@@ -99,6 +99,10 @@ public class EmploymentNewsAds {
                 } else {
                     job.setTitle("Recruitment notification");
                 }
+                String openings = com.jobads.input.AdTextExtractor.numberOfPosts(text);
+                if (!openings.isBlank()) {
+                    job.setOpenings(openings);
+                }
                 job.setApplyHow(buildApplyInfo(text, pdfUrl));
                 jobs.add(job);
                 done++;

@@ -130,6 +130,7 @@ public class SlideGenerator {
         y += 30;
         // Detail rows
         y = detail(g, "Company", job.getCompany(), y);
+        y = detail(g, "Openings", job.getOpenings(), y);
         y = detail(g, "Location", job.getLocation(), y);
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);

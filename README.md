@@ -161,6 +161,8 @@ java -jar target/news-job-ads-video.jar --employment-news --brand "Government Jo
   scans with no text layer) **OCR'd** to pull the position title and last date.
 - The headline is the extracted position when one is found (e.g. *"Finance-cum-Accounts Officer"*),
   otherwise the organisation name; `Source: Employment News` is shown on every slide.
+- The **number of openings/vacancies** is extracted (e.g. "No. of Posts: 05") and shown as its own
+  row when the notification states it.
 - The **How to Apply** line is built from the notification: application mode (online / by post / email),
   the application fee when stated, an application/website link when found, and always a link to the
   official notification PDF (the "link to the ad"). Links aren't read aloud — the narration points the

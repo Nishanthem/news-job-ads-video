@@ -258,6 +258,15 @@ class PipelineTest {
     }
 
     @Test
+    void adTextExtractorPullsNumberOfPosts() {
+        assertEquals("5", com.jobads.input.AdTextExtractor.numberOfPosts("No. of Posts: 05"));
+        assertEquals("12",
+                com.jobads.input.AdTextExtractor.numberOfPosts("Number of vacancies - 12 (Gen 6)"));
+        assertEquals("3", com.jobads.input.AdTextExtractor.numberOfPosts("There are 3 posts available."));
+        assertEquals("", com.jobads.input.AdTextExtractor.numberOfPosts("No numbers about posts here."));
+    }
+
+    @Test
     void employmentNewsBuildsRichApplyInfoWithPdfLink() {
         String text = "Applications are invited. Apply by post in the prescribed format. "
                 + "Fee: Rs. 500. Visit www.example.gov.in for the form.";
