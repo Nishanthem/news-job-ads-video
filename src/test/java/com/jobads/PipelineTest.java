@@ -242,6 +242,48 @@ class PipelineTest {
     }
 
     @Test
+    void adTextExtractorPullsModeFeeAndLink() {
+        String text = "National Board invites applications. Candidates should apply online through "
+                + "the portal www.natboard.edu.in. An application fee of Rs. 1000 is payable. "
+                + "For details visit employmentnews.gov.in.";
+        assertEquals("Apply online", com.jobads.input.AdTextExtractor.applyMode(text));
+        assertEquals("Fee: Rs. 1000", com.jobads.input.AdTextExtractor.applicationFee(text));
+        // Source host is excluded; the organisation portal is returned.
+        assertEquals("www.natboard.edu.in",
+                com.jobads.input.AdTextExtractor.applyLink(text, "employmentnews.gov.in"));
+
+        // Fee exemption is recognised as "No application fee".
+        assertEquals("No application fee",
+                com.jobads.input.AdTextExtractor.applicationFee("There is no application fee for SC/ST."));
+    }
+
+    @Test
+    void employmentNewsBuildsRichApplyInfoWithPdfLink() {
+        String text = "Applications are invited. Apply by post in the prescribed format. "
+                + "Fee: Rs. 500. Visit www.example.gov.in for the form.";
+        String pdf = "https://employmentnews.gov.in/writereaddata/123.pdf";
+        String apply = EmploymentNewsAds.buildApplyInfo(text, pdf);
+        assertTrue(apply.contains("Rs. 500"), "fee should be included");
+        assertTrue(apply.contains("www.example.gov.in"), "form link should be included");
+        assertTrue(apply.contains(pdf), "official PDF link should always be included");
+    }
+
+    @Test
+    void narratorSpeaksInstructionsButNotLinks() {
+        JobPosting job = new JobPosting();
+        job.setApplyHow("Apply online. Fee: Rs. 500. Form / details: www.example.gov.in. "
+                + "Official ad (PDF): https://employmentnews.gov.in/writereaddata/123.pdf");
+        String spoken = Narrator.spokenApply(job);
+        assertTrue(spoken.toLowerCase().contains("apply online"), "mode should be spoken");
+        assertTrue(spoken.toLowerCase().contains("rupees 500") || spoken.contains("500"),
+                "fee should be spoken");
+        assertFalse(spoken.contains("http"), "URLs should not be read aloud");
+        assertFalse(spoken.contains(".pdf"), "PDF link should not be read aloud");
+        assertTrue(spoken.toLowerCase().contains("shown on screen"),
+                "should point to on-screen link");
+    }
+
+    @Test
     void importerKeepsMalayalamValues() {
         String text = String.join("\n",
                 "Title: ലാസ്റ്റ് ഗ്രേഡ് സർവന്റ് ഒഴിവ്",

@@ -33,8 +33,6 @@ public class EmploymentNewsAds {
     /** PDFs resolve on the non-www host (the www host 404s for /writereaddata/). */
     private static final String PDF_BASE = "https://employmentnews.gov.in/writereaddata/";
     private static final String SOURCE_NAME = "Employment News";
-    private static final String DEFAULT_APPLY =
-            "Apply as per the official notification (PDF) on employmentnews.gov.in";
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -101,9 +99,7 @@ public class EmploymentNewsAds {
                 } else {
                     job.setTitle("Recruitment notification");
                 }
-                if (job.getApplyHow() == null || job.getApplyHow().isBlank()) {
-                    job.setApplyHow(DEFAULT_APPLY);
-                }
+                job.setApplyHow(buildApplyInfo(text, pdfUrl));
                 jobs.add(job);
                 done++;
                 System.out.println("[employment-news] " + org + " -> " + job.getTitle());
@@ -143,6 +139,30 @@ public class EmploymentNewsAds {
             ads.putIfAbsent(PDF_BASE + file, label);
         }
         return ads;
+    }
+
+    /**
+     * Compose a rich "How to Apply" line from the notification text: application mode, fee, an
+     * application/website link if present, and always the link to the official notification PDF
+     * (the "link to the ad"). Falls back to a sensible default when little is detected.
+     */
+    public static String buildApplyInfo(String text, String pdfUrl) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        String mode = com.jobads.input.AdTextExtractor.applyMode(text);
+        String fee = com.jobads.input.AdTextExtractor.applicationFee(text);
+        String link = com.jobads.input.AdTextExtractor.applyLink(text, "employmentnews.gov.in");
+
+        parts.add(!mode.isBlank() ? mode : "Apply as per the official notification");
+        if (!fee.isBlank()) {
+            parts.add(fee);
+        }
+        if (!link.isBlank()) {
+            parts.add("Form / details: " + link);
+        }
+        if (pdfUrl != null && !pdfUrl.isBlank()) {
+            parts.add("Official ad (PDF): " + pdfUrl);
+        }
+        return String.join(". ", parts);
     }
 
     /**

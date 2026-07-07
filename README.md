@@ -161,6 +161,10 @@ java -jar target/news-job-ads-video.jar --employment-news --brand "Government Jo
   scans with no text layer) **OCR'd** to pull the position title and last date.
 - The headline is the extracted position when one is found (e.g. *"Finance-cum-Accounts Officer"*),
   otherwise the organisation name; `Source: Employment News` is shown on every slide.
+- The **How to Apply** line is built from the notification: application mode (online / by post / email),
+  the application fee when stated, an application/website link when found, and always a link to the
+  official notification PDF (the "link to the ad"). Links aren't read aloud — the narration points the
+  listener to the on-screen details.
 - OCR of ~50 PDFs is slow, so it is capped with `--en-limit <n>` (default `12`).
 - Combine with `--sources` and/or `--input` to mix these ads with scraped/imported ones.
 

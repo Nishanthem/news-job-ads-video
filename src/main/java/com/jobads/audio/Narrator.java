@@ -111,20 +111,40 @@ public class Narrator {
      * character-by-character by a TTS engine (painful to hear), so for those we point the listener
      * to the on-screen details; plain instructions (e.g. "Walk-in interview") are read as-is.
      */
-    static String spokenApply(JobPosting job) {
+    public static String spokenApply(JobPosting job) {
         String raw = job.getApplyInfo();
-        String lower = raw.toLowerCase();
         boolean hasEmail = raw.contains("@");
-        boolean hasUrl = lower.contains("http") || lower.contains("www.")
-                || lower.matches(".*\\b[a-z0-9.-]+\\.(com|in|org|gov|net|edu|co)\\b.*");
-        boolean hasPhone = raw.replaceAll("[^0-9]", "").length() >= 7;
-        if (hasEmail || hasUrl) {
-            return "apply using the link and contact details shown on screen";
+
+        // Drop link/label segments that would be read out character-by-character (URLs, "PDF" links,
+        // "form / details:" pointers) but keep the readable instructions like mode and fee.
+        StringBuilder kept = new StringBuilder();
+        boolean droppedLink = hasEmail;
+        for (String seg : raw.split("\\.\\s+")) {
+            String s = seg.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            String lower = s.toLowerCase();
+            boolean segUrl = lower.contains("http") || lower.contains("www.")
+                    || lower.matches(".*\\b[a-z0-9.-]+\\.(com|in|org|gov|net|edu|co)\\b.*");
+            boolean segLinkLabel = lower.startsWith("form") || lower.contains("(pdf)")
+                    || lower.contains("official ad") || s.contains("@");
+            if (segUrl || segLinkLabel) {
+                droppedLink = true;
+                continue;
+            }
+            if (kept.length() > 0) {
+                kept.append(". ");
+            }
+            kept.append(s);
         }
-        if (hasPhone) {
-            return "apply using the phone number shown on screen";
+
+        String instructions = kept.toString().trim();
+        String tail = droppedLink ? "see the link and details shown on screen" : "";
+        if (instructions.isEmpty()) {
+            return tail.isEmpty() ? "see the details shown on screen" : tail;
         }
-        return sanitize(raw);
+        return tail.isEmpty() ? sanitize(instructions) : sanitize(instructions) + ". " + tail;
     }
 
     static String spokenSource(String source) {
