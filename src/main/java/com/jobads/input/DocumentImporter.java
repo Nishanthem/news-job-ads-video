@@ -90,6 +90,17 @@ public class DocumentImporter {
                             + " (skipped)");
                     continue;
                 }
+                // A consolidated UPSC advertisement lists many vacancies in one PDF; split it into
+                // one job per post rather than treating the whole file as a single ad.
+                if (UpscAdvertisement.looksLike(text)) {
+                    List<JobPosting> vacancies = UpscAdvertisement.parse(text, sourceName, null);
+                    if (!vacancies.isEmpty()) {
+                        jobs.addAll(vacancies);
+                        System.out.println("[import] " + f.getFileName() + " -> UPSC advertisement, "
+                                + vacancies.size() + " vacancies");
+                        continue;
+                    }
+                }
                 JobPosting job = parse(text, f);
                 jobs.add(job);
                 System.out.println("[import] " + f.getFileName() + " -> " + job.getTitle());

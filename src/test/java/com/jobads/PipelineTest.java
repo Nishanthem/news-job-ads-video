@@ -267,6 +267,40 @@ class PipelineTest {
     }
 
     @Test
+    void upscConsolidatedAdvertisementSplitsIntoVacancies() {
+        String text = "UNION PUBLIC SERVICE COMMISSION\n"
+                + "INVITES ONLINE RECRUITMENT APPLICATIONS\n"
+                + "VACANCY DETAILS\n\n"
+                + "1. (Vacancy No. 26060701227) Six vacancies for the post of Joint Director "
+                + "(Crops Development Directorate), Department of Agriculture and Farmers Welfare, "
+                + "Ministry of Agriculture and Farmers Welfare.\n\n"
+                + "RESERVATION POSITION:\n\n"
+                + "2. (Vacancy No. 26060706427) Two vacancies for the post of Deputy Superintending "
+                + "Archaeologist in Archaeological Survey of India, Ministry of Culture.\n\n"
+                + "RESERVATION POSITION:\n\n"
+                + "The closing date for submission is 1800 Hrs on 17-07-2026.\n"
+                + "candidates are required to pay a fee of Rs. 25/-\n";
+
+        assertTrue(com.jobads.input.UpscAdvertisement.looksLike(text));
+        List<JobPosting> vac = com.jobads.input.UpscAdvertisement.parse(text, null, null);
+        assertEquals(2, vac.size());
+
+        JobPosting first = vac.get(0);
+        assertEquals("Joint Director (Crops Development Directorate)", first.getTitle());
+        assertEquals("Ministry of Agriculture and Farmers Welfare", first.getCompany());
+        assertEquals("6", first.getOpenings());
+        assertEquals("17-07-2026", first.getLastDate());
+        assertEquals("UPSC", first.getSource());
+        assertTrue(first.getApplyInfo().contains("upsconline.nic.in"));
+        assertTrue(first.getApplyInfo().contains("Rs. 25"));
+
+        JobPosting second = vac.get(1);
+        assertEquals("Deputy Superintending Archaeologist", second.getTitle());
+        assertEquals("Ministry of Culture", second.getCompany());
+        assertEquals("2", second.getOpenings());
+    }
+
+    @Test
     void employmentNewsBuildsRichApplyInfoWithPdfLink() {
         String text = "Applications are invited. Apply by post in the prescribed format. "
                 + "Fee: Rs. 500. Visit www.example.gov.in for the form.";

@@ -139,6 +139,11 @@ java -jar target/news-job-ads-video.jar --input my-ads/ --out jobs.mp4 --brand "
   `Salary`, `Last date`, `How to apply`, `Contact`); otherwise it uses the first line as the title.
 - OCR is not perfect (especially Malayalam on scans) — review the extracted details before publishing.
 - `--input` can be combined with `--sources`; imported ads bypass the keyword filter.
+- **UPSC consolidated advertisements:** a UPSC advertisement PDF (e.g. *Advertisement No. 07/2026*)
+  lists many separate vacancies in one file. These are detected automatically and **split into one
+  slide per post** — each with the post name, ministry/department, number of vacancies, the common
+  closing date, and how to apply (online at `upsconline.nic.in/ora/`, plus the fee). Just pass the
+  PDF with `--input AdvtNo-07-2026.pdf --source-name "UPSC"`.
 - **Source label:** imported files have no known source, so by default no source line is shown. Add a
   `Source: <name>` line inside the document, or pass `--source-name "Times of India"` to label every
   imported ad in the run.
