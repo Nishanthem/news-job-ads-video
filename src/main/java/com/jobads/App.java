@@ -1,10 +1,13 @@
 package com.jobads;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jobads.audio.BackgroundMusic;
 import com.jobads.audio.Narrator;
 import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
+import com.jobads.input.DocumentImporter;
 import com.jobads.model.JobPosting;
+import com.jobads.scraper.EmploymentNewsAds;
 import com.jobads.scraper.EvidenceCapture;
 import com.jobads.scraper.JobScraper;
 import com.jobads.scraper.SiteConfig;
@@ -33,6 +36,12 @@ import java.util.Map;
  *   java -jar news-job-ads-video.jar [options]
  *     --sample              use bundled sample-jobs.json instead of scraping (default if no sources)
  *     --sources &lt;file&gt;      path to a sources.json describing sites to scrape
+ *     --input &lt;path&gt;        a PDF/image file (or a folder of them) to read job ads from
+ *     --employment-news     also pull ads from the official Employment News "Web Advertisement"
+ *                            page (downloads &amp; OCRs the free notification PDFs)
+ *     --en-limit &lt;n&gt;        max Employment News PDFs to OCR per run (default: 12)
+ *     --source-name &lt;text&gt;  source label for imported jobs (e.g. the newspaper name); if omitted,
+ *                            no source is shown for imported files
  *     --out &lt;file&gt;          output video path (default: jobs.mp4)
  *     --brand &lt;text&gt;        brand/title shown in the header (default: "Job Alerts")
  *     --seconds &lt;n&gt;         seconds each slide is shown (default: 5)
@@ -41,6 +50,8 @@ import java.util.Map;
  *     --evidence &lt;dir&gt;      directory to save proof-of-source evidence (default: &lt;out&gt;/evidence)
  *     --no-evidence         skip capturing evidence screenshots
  *     --no-audio            skip spoken narration (otherwise on when a TTS engine is available)
+ *     --music &lt;file&gt;        background-music file to loop quietly under the video
+ *     --no-music            disable background music (on by default with a synthesised bed)
  *     --disclaimer &lt;text&gt;   custom disclaimer shown/narrated after the intro (has a default)
  *     --no-disclaimer       omit the disclaimer card
  * </pre>
@@ -62,7 +73,11 @@ public class App {
 
     public static void main(String[] args) throws Exception {
         Map<String, String> opts = parseArgs(args);
-        boolean useSample = opts.containsKey("sample") || !opts.containsKey("sources");
+        boolean hasSources = opts.containsKey("sources");
+        boolean hasInput = opts.containsKey("input");
+        boolean hasEmploymentNews = opts.containsKey("employment-news");
+        boolean useSample = opts.containsKey("sample")
+                || (!hasSources && !hasInput && !hasEmploymentNews);
 
         String brand = opts.getOrDefault("brand", "Job Alerts");
         Path output = Paths.get(opts.getOrDefault("out", "jobs.mp4"));
@@ -70,28 +85,59 @@ public class App {
         int fps = Integer.parseInt(opts.getOrDefault("fps", "25"));
         int limit = Integer.parseInt(opts.getOrDefault("limit", "-1"));
 
-        List<JobPosting> jobs;
+        List<JobPosting> jobs = new ArrayList<>();
         if (useSample) {
             System.out.println("[app] running in SAMPLE mode (no network).");
             System.out.println("[app] note: evidence capture is skipped in sample mode "
                     + "(there is no real source page to screenshot).");
-            jobs = loadSample();
+            jobs.addAll(loadSample());
         } else {
-            List<SiteConfig> sites = loadSources(Paths.get(opts.get("sources")));
-            List<JobPosting> scraped = new JobScraper().scrapeAll(sites);
-            jobs = new JobFilter().filter(scraped);
-            System.out.println("[app] " + jobs.size() + " job ad(s) after filtering.");
+            if (hasSources) {
+                List<SiteConfig> sites = loadSources(Paths.get(opts.get("sources")));
+                List<JobPosting> scraped = new JobScraper().scrapeAll(sites);
+                List<JobPosting> filtered = new JobFilter().filter(scraped);
+                System.out.println("[app] " + filtered.size() + " job ad(s) after filtering.");
+                jobs.addAll(filtered);
 
-            if (!opts.containsKey("no-evidence")) {
-                Path evidenceDir = Paths.get(opts.getOrDefault("evidence", defaultEvidenceDir(output)));
-                int evidenceCap = limit > 0 ? limit : 25;
-                System.out.println("[app] capturing proof-of-source evidence (up to " + evidenceCap
-                        + " per site) to " + evidenceDir);
+                if (!opts.containsKey("no-evidence")) {
+                    Path evidenceDir = Paths.get(
+                            opts.getOrDefault("evidence", defaultEvidenceDir(output)));
+                    int evidenceCap = limit > 0 ? limit : 25;
+                    System.out.println("[app] capturing proof-of-source evidence (up to "
+                            + evidenceCap + " per site) to " + evidenceDir);
+                    try {
+                        new EvidenceCapture().captureAll(sites, evidenceDir, evidenceCap);
+                    } catch (Exception e) {
+                        System.err.println("[app] evidence capture failed (continuing without it): "
+                                + e.getMessage());
+                    }
+                }
+            }
+            if (hasEmploymentNews) {
+                int enMax = Integer.parseInt(opts.getOrDefault("en-limit", "12"));
+                System.out.println("[app] collecting Employment News web advertisements "
+                        + "(official free notification PDFs, OCR'd)");
                 try {
-                    new EvidenceCapture().captureAll(sites, evidenceDir, evidenceCap);
+                    List<JobPosting> enJobs = new EmploymentNewsAds().collect(enMax);
+                    System.out.println("[app] collected " + enJobs.size()
+                            + " Employment News ad(s).");
+                    jobs.addAll(enJobs);
                 } catch (Exception e) {
-                    System.err.println("[app] evidence capture failed (continuing without it): "
-                            + e.getMessage());
+                    System.err.println("[app] Employment News collection failed: " + e.getMessage());
+                }
+            }
+            if (hasInput) {
+                Path inputPath = Paths.get(opts.get("input"));
+                System.out.println("[app] importing job ads from PDF/image input: " + inputPath);
+                try {
+                    String sourceName = opts.get("source-name");
+                    List<JobPosting> imported =
+                            new DocumentImporter("eng+mal", sourceName).importPath(inputPath);
+                    System.out.println("[app] imported " + imported.size()
+                            + " job ad(s) from documents.");
+                    jobs.addAll(imported);
+                } catch (Exception e) {
+                    System.err.println("[app] document import failed: " + e.getMessage());
                 }
             }
         }
@@ -136,6 +182,29 @@ public class App {
         VideoBuilder videoBuilder = new VideoBuilder(seconds, fps);
         boolean wantAudio = !opts.containsKey("no-audio");
 
+        // Background music (on by default). Use the user's file if given, otherwise synthesise a
+        // royalty-free ambient bed so the video has music out of the box.
+        Path music = null;
+        if (!opts.containsKey("no-music")) {
+            if (opts.containsKey("music")) {
+                Path provided = Paths.get(opts.get("music"));
+                if (Files.isRegularFile(provided)) {
+                    music = provided;
+                    System.out.println("[app] using background music: " + provided);
+                } else {
+                    System.err.println("[app] --music file not found (" + provided
+                            + "); falling back to the synthesised bed.");
+                }
+            }
+            if (music == null) {
+                music = BackgroundMusic.generateDefaultLoop(workDir);
+                if (music != null) {
+                    System.out.println("[app] using synthesised royalty-free background music "
+                            + "(use --no-music to disable)");
+                }
+            }
+        }
+
         if (wantAudio && narrator.isAvailable()) {
             System.out.println("[app] generating narration with " + narrator.engineName()
                     + " (use --no-audio to disable)");
@@ -145,14 +214,15 @@ public class App {
                         workDir.resolve(String.format("voice-%03d.wav", i))));
             }
             System.out.println("[app] building narrated video with ffmpeg -> " + output.toAbsolutePath());
-            videoBuilder.buildWithAudio(slides, audios, output);
+            videoBuilder.buildWithAudio(slides, audios, output, music);
         } else {
             if (wantAudio) {
                 System.out.println("[app] no TTS engine found (install pico2wave or espeak-ng for "
-                        + "narration); building a silent video.");
+                        + "narration); building a "
+                        + (music != null ? "music-only" : "silent") + " video.");
             }
             System.out.println("[app] building video with ffmpeg -> " + output.toAbsolutePath());
-            videoBuilder.build(slides, output);
+            videoBuilder.build(slides, output, music);
         }
 
         System.out.println("[app] DONE. Video written to: " + output.toAbsolutePath());

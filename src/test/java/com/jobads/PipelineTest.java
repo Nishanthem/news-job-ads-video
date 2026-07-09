@@ -3,11 +3,16 @@ package com.jobads;
 import com.jobads.audio.Narrator;
 import com.jobads.filter.JobFilter;
 import com.jobads.image.SlideGenerator;
+import com.jobads.input.DocumentImporter;
 import com.jobads.model.JobPosting;
+import com.jobads.scraper.EmploymentNewsAds;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -156,5 +161,181 @@ class PipelineTest {
         JobPosting rankList = new JobPosting();
         rankList.setTitle("കേരള പി.എസ്.സി. റാങ്ക് ലിസ്റ്റുകൾ");
         assertFalse(filter.isJobAd(rankList), "PSC rank list (not a job opening) should be dropped");
+    }
+
+    @Test
+    void importerParsesLabelledText() {
+        String text = String.join("\n",
+                "Title: Staff Nurse",
+                "Company: Government General Hospital",
+                "Location: Ernakulam",
+                "Qualification: B.Sc Nursing",
+                "Salary: Rs. 35,000 per month",
+                "Last date: 25-06-2026",
+                "How to apply: Apply online at the hospital portal",
+                "Contact: recruit@gghospital.gov.in");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("nurse.pdf"));
+        assertEquals("Staff Nurse", job.getTitle());
+        assertEquals("Government General Hospital", job.getCompany());
+        assertEquals("Ernakulam", job.getLocation());
+        assertEquals("B.Sc Nursing", job.getQualification());
+        assertEquals("25-06-2026", job.getLastDate());
+        assertEquals("recruit@gghospital.gov.in", job.getContact());
+        assertTrue(job.getApplyInfo().contains("Apply online"), "applyHow should be picked up");
+        // No source is fabricated for imported files when none is known.
+        assertTrue(job.getSource() == null || job.getSource().isBlank(),
+                "source should be blank when not provided");
+    }
+
+    @Test
+    void importerUsesSourceLineThenSourceNameFallback() {
+        // A "Source:" line in the document wins.
+        String withSource = String.join("\n",
+                "Title: Lab Technician",
+                "Source: Malayala Manorama");
+        JobPosting a = new DocumentImporter("eng", "Fallback Daily").parse(withSource, Paths.get("a.pdf"));
+        assertEquals("Malayala Manorama", a.getSource());
+
+        // Without a Source line, the run-wide source name is used.
+        String noSource = "Title: Lab Technician";
+        JobPosting b = new DocumentImporter("eng", "Fallback Daily").parse(noSource, Paths.get("b.pdf"));
+        assertEquals("Fallback Daily", b.getSource());
+    }
+
+    @Test
+    void importerFallsBackToFirstLineAndFindsDateAndEmail() {
+        // No explicit Title/Contact labels: title = first line, contact = email found in body,
+        // last date = date near the "last date" phrase.
+        String text = String.join("\n",
+                "Walk-in for Computer Operators",
+                "Some descriptive paragraph about the role.",
+                "The last date to apply is 30-06-2026.",
+                "Send CV to careers@firm.example");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("ad.png"));
+        assertEquals("Walk-in for Computer Operators", job.getTitle());
+        assertEquals("30-06-2026", job.getLastDate());
+        assertEquals("careers@firm.example", job.getContact());
+    }
+
+    @Test
+    void employmentNewsCleansOrgLabel() {
+        assertEquals("ALLAHABAD MUSEUM",
+                EmploymentNewsAds.cleanOrg("ALLAHABAD MUSEUM ( Issue no 14 , 04 - 10 July 2026 )"));
+        assertEquals("RAMAN RESEARCH INSTITUTE",
+                EmploymentNewsAds.cleanOrg("RAMAN RESEARCH INSTITUTE"));
+    }
+
+    @Test
+    void employmentNewsExtractsPositionFromNotificationText() {
+        String ndma = "National Disaster Management Authority. Advertisement for the position of "
+                + "Senior Consultant (Mitigation of Floods) in NDMA on contract basis.";
+        assertEquals("Senior Consultant", EmploymentNewsAds.extractPosition(ndma));
+
+        String museum = "Allahabad Museum invites applications for the post of "
+                + "Finance-cum-Accounts Officer (Number of Post- 01).";
+        assertEquals("Finance-cum-Accounts Officer", EmploymentNewsAds.extractPosition(museum));
+
+        // OCR gibberish / no recognisable position -> null (caller falls back to the org name).
+        assertNull(EmploymentNewsAds.extractPosition("Tella Tet wets fears fagafaenrcra"));
+    }
+
+    @Test
+    void adTextExtractorPullsModeFeeAndLink() {
+        String text = "National Board invites applications. Candidates should apply online through "
+                + "the portal www.natboard.edu.in. An application fee of Rs. 1000 is payable. "
+                + "For details visit employmentnews.gov.in.";
+        assertEquals("Apply online", com.jobads.input.AdTextExtractor.applyMode(text));
+        assertEquals("Fee: Rs. 1000", com.jobads.input.AdTextExtractor.applicationFee(text));
+        // Source host is excluded; the organisation portal is returned.
+        assertEquals("www.natboard.edu.in",
+                com.jobads.input.AdTextExtractor.applyLink(text, "employmentnews.gov.in"));
+
+        // Fee exemption is recognised as "No application fee".
+        assertEquals("No application fee",
+                com.jobads.input.AdTextExtractor.applicationFee("There is no application fee for SC/ST."));
+    }
+
+    @Test
+    void adTextExtractorPullsNumberOfPosts() {
+        assertEquals("5", com.jobads.input.AdTextExtractor.numberOfPosts("No. of Posts: 05"));
+        assertEquals("12",
+                com.jobads.input.AdTextExtractor.numberOfPosts("Number of vacancies - 12 (Gen 6)"));
+        assertEquals("3", com.jobads.input.AdTextExtractor.numberOfPosts("There are 3 posts available."));
+        assertEquals("", com.jobads.input.AdTextExtractor.numberOfPosts("No numbers about posts here."));
+    }
+
+    @Test
+    void upscConsolidatedAdvertisementSplitsIntoVacancies() {
+        String text = "UNION PUBLIC SERVICE COMMISSION\n"
+                + "INVITES ONLINE RECRUITMENT APPLICATIONS\n"
+                + "VACANCY DETAILS\n\n"
+                + "1. (Vacancy No. 26060701227) Six vacancies for the post of Joint Director "
+                + "(Crops Development Directorate), Department of Agriculture and Farmers Welfare, "
+                + "Ministry of Agriculture and Farmers Welfare.\n\n"
+                + "RESERVATION POSITION:\n\n"
+                + "2. (Vacancy No. 26060706427) Two vacancies for the post of Deputy Superintending "
+                + "Archaeologist in Archaeological Survey of India, Ministry of Culture.\n\n"
+                + "RESERVATION POSITION:\n\n"
+                + "The closing date for submission is 1800 Hrs on 17-07-2026.\n"
+                + "candidates are required to pay a fee of Rs. 25/-\n";
+
+        assertTrue(com.jobads.input.UpscAdvertisement.looksLike(text));
+        List<JobPosting> vac = com.jobads.input.UpscAdvertisement.parse(text, null, null);
+        assertEquals(2, vac.size());
+
+        JobPosting first = vac.get(0);
+        assertEquals("Joint Director (Crops Development Directorate)", first.getTitle());
+        assertEquals("Ministry of Agriculture and Farmers Welfare", first.getCompany());
+        assertEquals("6", first.getOpenings());
+        assertEquals("17-07-2026", first.getLastDate());
+        assertEquals("UPSC", first.getSource());
+        assertTrue(first.getApplyInfo().contains("upsconline.nic.in"));
+        assertTrue(first.getApplyInfo().contains("Rs. 25"));
+
+        JobPosting second = vac.get(1);
+        assertEquals("Deputy Superintending Archaeologist", second.getTitle());
+        assertEquals("Ministry of Culture", second.getCompany());
+        assertEquals("2", second.getOpenings());
+    }
+
+    @Test
+    void employmentNewsBuildsRichApplyInfoWithPdfLink() {
+        String text = "Applications are invited. Apply by post in the prescribed format. "
+                + "Fee: Rs. 500. Visit www.example.gov.in for the form.";
+        String pdf = "https://employmentnews.gov.in/writereaddata/123.pdf";
+        String apply = EmploymentNewsAds.buildApplyInfo(text, pdf);
+        assertTrue(apply.contains("Rs. 500"), "fee should be included");
+        assertTrue(apply.contains("www.example.gov.in"), "form link should be included");
+        assertTrue(apply.contains(pdf), "official PDF link should always be included");
+    }
+
+    @Test
+    void narratorSpeaksInstructionsButNotLinks() {
+        JobPosting job = new JobPosting();
+        job.setApplyHow("Apply online. Fee: Rs. 500. Form / details: www.example.gov.in. "
+                + "Official ad (PDF): https://employmentnews.gov.in/writereaddata/123.pdf");
+        String spoken = Narrator.spokenApply(job);
+        assertTrue(spoken.toLowerCase().contains("apply online"), "mode should be spoken");
+        assertTrue(spoken.toLowerCase().contains("rupees 500") || spoken.contains("500"),
+                "fee should be spoken");
+        assertFalse(spoken.contains("http"), "URLs should not be read aloud");
+        assertFalse(spoken.contains(".pdf"), "PDF link should not be read aloud");
+        assertTrue(spoken.toLowerCase().contains("shown on screen"),
+                "should point to on-screen link");
+    }
+
+    @Test
+    void importerKeepsMalayalamValues() {
+        String text = String.join("\n",
+                "Title: ലാസ്റ്റ് ഗ്രേഡ് സർവന്റ് ഒഴിവ്",
+                "Company: കേരള പബ്ലിക് സർവീസ് കമ്മീഷൻ",
+                "Last date: 20-06-2026");
+
+        JobPosting job = new DocumentImporter().parse(text, Paths.get("ml.pdf"));
+        assertEquals("ലാസ്റ്റ് ഗ്രേഡ് സർവന്റ് ഒഴിവ്", job.getTitle());
+        assertTrue(Narrator.containsMalayalam(job.getTitle()), "title should retain Malayalam");
+        assertEquals("കേരള പബ്ലിക് സർവീസ് കമ്മീഷൻ", job.getCompany());
     }
 }

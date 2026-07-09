@@ -130,6 +130,7 @@ public class SlideGenerator {
         y += 30;
         // Detail rows
         y = detail(g, "Company", job.getCompany(), y);
+        y = detail(g, "Openings", job.getOpenings(), y);
         y = detail(g, "Location", job.getLocation(), y);
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);
@@ -137,11 +138,13 @@ public class SlideGenerator {
         // "How to Apply" highlighted so the viewer always knows the next step.
         y = detail(g, "How to Apply", job.getApplyInfo(), y, ACCENT);
 
-        // Footer / source attribution
-        g.setColor(MUTED);
-        g.setFont(new Font("SansSerif", Font.ITALIC, 22));
-        String src = "Source: " + nonEmpty(job.getSource(), "newspaper listing");
-        g.drawString(src, 60, HEIGHT - 50);
+        // Footer / source attribution (omitted entirely when the source is unknown)
+        String source = job.getSource();
+        if (source != null && !source.isBlank()) {
+            g.setColor(MUTED);
+            g.setFont(new Font("SansSerif", Font.ITALIC, 22));
+            g.drawString("Source: " + source, 60, HEIGHT - 50);
+        }
 
         g.dispose();
         return write(img, outDir, fileName);
