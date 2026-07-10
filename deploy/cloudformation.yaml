@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Serverless scheduled deployment for news-job-ads-video. Runs the pipeline as a
+  daily ECS Fargate task (no always-on EC2), uploading the video + evidence to S3.
+  You pay only for the few minutes the task runs each day.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: news-job-ads-video
+    Description: Name prefix for all created resources.
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC in which the Fargate task runs.
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >
+      Subnets for the task ENI. Use PUBLIC subnets (with AssignPublicIp=ENABLED)
+      or private subnets that have a NAT gateway, so the task can reach the
+      internet to scrape sites and upload to S3.
+
+  AssignPublicIp:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+    Description: ENABLED for public subnets; DISABLED for private subnets with NAT.
+
+  ScheduleExpression:
+    Type: String
+    Default: cron(0 6 * * ? *)
+    Description: When to run (EventBridge Scheduler cron). Default 06:00 daily.
+
+  ScheduleTimezone:
+    Type: String
+    Default: Asia/Kolkata
+    Description: IANA timezone for the schedule.
+
+  ScheduleEnabled:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+    Description: Set DISABLED to keep everything provisioned but not run automatically.
+
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Container image tag in ECR to run.
+
+  TaskCpu:
+    Type: String
+    Default: "2048"
+    AllowedValues: ["1024", "2048", "4096"]
+    Description: Fargate task CPU units (2048 = 2 vCPU).
+
+  TaskMemory:
+    Type: String
+    Default: "4096"
+    Description: Fargate task memory (MiB). Must be valid for the chosen CPU.
+
+  Mode:
+    Type: String
+    Default: scrape
+    AllowedValues: [scrape, sample]
+    Description: scrape real sites, or use bundled sample data.
+
+  Brand:
+    Type: String
+    Default: RightRoads Job News
+    Description: Title shown on the slides.
+
+  JobLimit:
+    Type: String
+    Default: ""
+    Description: Optional cap on number of jobs (empty = no cap).
+
+Conditions:
+  HasBrand: !Not [!Equals [!Ref Brand, ""]]
+  HasLimit: !Not [!Equals [!Ref JobLimit, ""]]
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ProjectName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only the last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-runs
+            Status: Enabled
+            ExpirationInDays: 90
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${ProjectName}"
+      RetentionInDays: 30
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ProjectName
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} Fargate task egress"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound (scrape sites + upload to S3)
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-output-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt OutputBucket.Arn
+                  - !Sub "${OutputBucket.Arn}/*"
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref ProjectName
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ContainerDefinitions:
+        - Name: app
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}:${ImageTag}"
+          Essential: true
+          Environment:
+            - Name: OUTPUT_S3_BUCKET
+              Value: !Ref OutputBucket
+            - Name: MODE
+              Value: !Ref Mode
+            - !If
+              - HasBrand
+              - { Name: BRAND, Value: !Ref Brand }
+              - !Ref AWS::NoValue
+            - !If
+              - HasLimit
+              - { Name: LIMIT, Value: !Ref JobLimit }
+              - !Ref AWS::NoValue
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: run-ecs-task
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecs:RunTask
+                Resource: !Ref TaskDefinition
+                Condition:
+                  ArnLike:
+                    ecs:cluster: !GetAtt Cluster.Arn
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !GetAtt ExecutionRole.Arn
+                  - !GetAtt TaskRole.Arn
+
+  DailySchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${ProjectName}-daily"
+      State: !Ref ScheduleEnabled
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: !Ref ScheduleExpression
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      Target:
+        Arn: !GetAtt Cluster.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        EcsParameters:
+          TaskDefinitionArn: !Ref TaskDefinition
+          LaunchType: FARGATE
+          TaskCount: 1
+          NetworkConfiguration:
+            AwsvpcConfiguration:
+              Subnets: !Ref SubnetIds
+              SecurityGroups: [!Ref TaskSecurityGroup]
+              AssignPublicIp: !Ref AssignPublicIp
+        RetryPolicy:
+          MaximumRetryAttempts: 1
+
+Outputs:
+  EcrRepositoryUri:
+    Description: Push your image here (deploy.sh does this for you).
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}"
+  OutputBucketName:
+    Description: Bucket where videos + evidence are uploaded.
+    Value: !Ref OutputBucket
+  ClusterName:
+    Value: !Ref Cluster
+  TaskDefinitionArn:
+    Value: !Ref TaskDefinition
+  RunOnceCommand:
+    Description: Trigger a run immediately (without waiting for the schedule).
+    Value: !Sub >-
+      aws ecs run-task --cluster ${Cluster} --launch-type FARGATE
+      --task-definition ${ProjectName}
+      --network-configuration "awsvpcConfiguration={subnets=[<SUBNET_ID>],securityGroups=[${TaskSecurityGroup}],assignPublicIp=${AssignPublicIp}}"
