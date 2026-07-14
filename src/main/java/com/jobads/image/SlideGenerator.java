@@ -134,9 +134,25 @@ public class SlideGenerator {
         y = detail(g, "Qualification", job.getQualification(), y);
         y = detail(g, "Salary", job.getSalary(), y);
         y = detail(g, "Last Date", job.getLastDate(), y);
-        y = detail(g, "Contact", job.getContact(), y);
-        // Show the direct apply link when available.
-        y = detail(g, "Apply Link", job.getLink(), y, ACCENT);
+
+        // How-to-apply block. The narration always tells the viewer how to apply
+        // (JobPosting#getApplyInfo), so the slide must too — show whatever the source
+        // actually provides, falling back to the explicit instruction when it has no
+        // scraped contact/link (otherwise these rows silently disappear).
+        boolean shownApply = false;
+        if (job.getContact() != null && !job.getContact().isBlank()) {
+            y = detail(g, "Contact", job.getContact(), y);
+            shownApply = true;
+        }
+        if (job.getLink() != null && !job.getLink().isBlank()) {
+            y = detail(g, "Apply Link", job.getLink(), y, ACCENT);
+            shownApply = true;
+        }
+        if (job.getApplyHow() != null && !job.getApplyHow().isBlank()) {
+            y = detail(g, "How to Apply", job.getApplyHow(), y, ACCENT);
+        } else if (!shownApply) {
+            y = detail(g, "How to Apply", job.getApplyInfo(), y, ACCENT);
+        }
 
         // Footer / source attribution
         g.setColor(MUTED);
