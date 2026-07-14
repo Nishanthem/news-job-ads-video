@@ -9,15 +9,20 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Combines the rendered slide images into an MP4 using the system {@code ffmpeg} binary via the
- * concat demuxer. Each slide is shown for a fixed number of seconds.
+ * Combines the rendered slide images into an MP4 using the system {@code ffmpeg} binary. Slides are
+ * stitched together with a short crossfade ({@code xfade}) so the video flows instead of hard-cutting
+ * between static frames. When narration is supplied, each slide is shown for as long as its spoken
+ * line plays and the crossfades happen during the silent lead/trail padding, so audio stays in sync.
  */
 public class VideoBuilder {
+
+    /** Crossfade length between consecutive slides, in seconds. */
+    private static final double TRANSITION = 0.4;
 
     private final int secondsPerSlide;
     private final int fps;
     private Path bgmPath;
-    private double bgmVolume = 0.15;
+    private double bgmVolume = 0.12;
 
     public VideoBuilder(int secondsPerSlide, int fps) {
         this.secondsPerSlide = secondsPerSlide;
@@ -30,7 +35,7 @@ public class VideoBuilder {
     }
 
     /**
-     * Build the video.
+     * Build a silent video (no narration). Each slide is shown for {@code secondsPerSlide}.
      *
      * @param slides ordered list of PNG paths
      * @param output destination .mp4 path
@@ -40,63 +45,55 @@ public class VideoBuilder {
         if (slides == null || slides.isEmpty()) {
             throw new IllegalArgumentException("No slides to build a video from");
         }
-        if (!isFfmpegAvailable()) {
-            throw new IllegalStateException(
-                    "ffmpeg was not found on PATH. Install ffmpeg to generate the video.");
-        }
+        requireFfmpeg();
 
-        Path listFile = Files.createTempFile("slides-", ".txt");
-        StringBuilder sb = new StringBuilder();
-        for (Path slide : slides) {
-            // The concat demuxer needs each image followed by its duration.
-            sb.append("file '").append(slide.toAbsolutePath()).append("'\n");
-            sb.append("duration ").append(secondsPerSlide).append("\n");
+        List<Double> durations = new ArrayList<>();
+        for (int i = 0; i < slides.size(); i++) {
+            durations.add((double) secondsPerSlide);
         }
-        // Repeat the last frame once (without duration) so its duration is actually applied.
-        sb.append("file '").append(slides.get(slides.size() - 1).toAbsolutePath()).append("'\n");
-        Files.writeString(listFile, sb.toString(), StandardCharsets.UTF_8);
+        double total = durations.stream().mapToDouble(Double::doubleValue).sum();
+        double t = transitionFor(durations);
 
-        if (bgmPath != null && Files.isRegularFile(bgmPath)) {
-            double totalDur = (double) slides.size() * secondsPerSlide;
-            List<String> cmd = new ArrayList<>();
-            cmd.addAll(List.of("ffmpeg", "-y",
-                    "-f", "concat", "-safe", "0", "-i", listFile.toAbsolutePath().toString(),
-                    "-stream_loop", "-1", "-i", bgmPath.toAbsolutePath().toString(),
-                    "-vf", "fps=" + fps + ",format=yuv420p",
-                    "-filter_complex", "[1:a]volume=" + fmt(bgmVolume) + "[bgm]",
-                    "-map", "0:v", "-map", "[bgm]",
-                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
-                    "-t", fmt(totalDur),
-                    "-movflags", "+faststart",
-                    output.toAbsolutePath().toString()));
-            runFfmpeg2(cmd, listFile);
-        } else {
-            List<String> cmd = new ArrayList<>();
-            cmd.add("ffmpeg");
-            cmd.add("-y");
-            cmd.add("-f");
-            cmd.add("concat");
-            cmd.add("-safe");
-            cmd.add("0");
+        List<String> cmd = new ArrayList<>();
+        cmd.add("ffmpeg");
+        cmd.add("-y");
+        cmd.addAll(imageInputs(slides, durations, t));
+
+        StringBuilder filter = new StringBuilder(videoXfadeFilter(slides.size(), durations, t, total));
+        boolean hasBgm = bgmPath != null && Files.isRegularFile(bgmPath);
+        if (hasBgm) {
+            cmd.add("-stream_loop");
+            cmd.add("-1");
             cmd.add("-i");
-            cmd.add(listFile.toAbsolutePath().toString());
-            cmd.add("-vf");
-            cmd.add("fps=" + fps + ",format=yuv420p");
-            cmd.add("-movflags");
-            cmd.add("+faststart");
-            cmd.add(output.toAbsolutePath().toString());
-
-            Process process = new ProcessBuilder(cmd)
-                    .redirectErrorStream(true)
-                    .start();
-            String log = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exit = process.waitFor();
-            Files.deleteIfExists(listFile);
-
-            if (exit != 0) {
-                throw new IOException("ffmpeg failed (exit " + exit + "):\n" + log);
-            }
+            cmd.add(bgmPath.toAbsolutePath().toString());
+            int bgmIdx = slides.size();
+            filter.append(";[").append(bgmIdx).append(":a]volume=")
+                    .append(fmt(bgmVolume)).append("[aout]");
         }
+
+        cmd.add("-filter_complex");
+        cmd.add(filter.toString());
+        cmd.add("-map");
+        cmd.add("[vout]");
+        if (hasBgm) {
+            cmd.add("-map");
+            cmd.add("[aout]");
+            cmd.add("-c:a");
+            cmd.add("aac");
+            cmd.add("-b:a");
+            cmd.add("128k");
+        }
+        cmd.add("-c:v");
+        cmd.add("libx264");
+        cmd.add("-pix_fmt");
+        cmd.add("yuv420p");
+        cmd.add("-t");
+        cmd.add(fmt(total));
+        cmd.add("-movflags");
+        cmd.add("+faststart");
+        cmd.add(output.toAbsolutePath().toString());
+
+        runFfmpeg(cmd);
         return output;
     }
 
@@ -116,10 +113,7 @@ public class VideoBuilder {
         if (slides.size() != audios.size()) {
             throw new IllegalArgumentException("slides and audios must be the same size");
         }
-        if (!isFfmpegAvailable()) {
-            throw new IllegalStateException(
-                    "ffmpeg was not found on PATH. Install ffmpeg to generate the video.");
-        }
+        requireFfmpeg();
 
         double leadSec = 0.4;
         double trailSec = 0.8;
@@ -138,13 +132,13 @@ public class VideoBuilder {
             if (speech > 0) {
                 // Lead silence (adelay) + pad with trailing silence, then cut to the exact length.
                 int delayMs = (int) Math.round(leadSec * 1000);
-                runFfmpeg(List.of("-y", "-i", audio.toAbsolutePath().toString(),
+                runFfmpeg(ff("-y", "-i", audio.toAbsolutePath().toString(),
                         "-af", "adelay=" + delayMs + "|" + delayMs + ",apad",
                         "-t", fmt(total), "-ar", "22050", "-ac", "1",
                         padded.toAbsolutePath().toString()));
             } else {
                 // Pure silence matching the slide duration.
-                runFfmpeg(List.of("-y", "-f", "lavfi", "-i",
+                runFfmpeg(ff("-y", "-f", "lavfi", "-i",
                         "anullsrc=channel_layout=mono:sample_rate=22050",
                         "-t", fmt(total), padded.toAbsolutePath().toString()));
             }
@@ -159,47 +153,122 @@ public class VideoBuilder {
         }
         Files.writeString(audioList, asb.toString(), StandardCharsets.UTF_8);
         Path combinedAudio = tmpDir.resolve("combined.wav");
-        runFfmpeg(List.of("-y", "-f", "concat", "-safe", "0",
+        runFfmpeg(ff("-y", "-f", "concat", "-safe", "0",
                 "-i", audioList.toAbsolutePath().toString(),
                 "-c", "copy", combinedAudio.toAbsolutePath().toString()));
 
-        // Image concat list with per-slide durations.
-        Path imageList = tmpDir.resolve("slides.txt");
-        StringBuilder isb = new StringBuilder();
-        for (int i = 0; i < slides.size(); i++) {
-            isb.append("file '").append(slides.get(i).toAbsolutePath()).append("'\n");
-            isb.append("duration ").append(fmt(durations.get(i))).append("\n");
-        }
-        isb.append("file '").append(slides.get(slides.size() - 1).toAbsolutePath()).append("'\n");
-        Files.writeString(imageList, isb.toString(), StandardCharsets.UTF_8);
+        double totalDur = durations.stream().mapToDouble(Double::doubleValue).sum();
+        double t = transitionFor(durations);
 
-        if (bgmPath != null && Files.isRegularFile(bgmPath)) {
-            double totalDur = durations.stream().mapToDouble(Double::doubleValue).sum();
-            runFfmpeg(List.of("-y",
-                    "-f", "concat", "-safe", "0", "-i", imageList.toAbsolutePath().toString(),
-                    "-i", combinedAudio.toAbsolutePath().toString(),
-                    "-stream_loop", "-1", "-i", bgmPath.toAbsolutePath().toString(),
-                    "-filter_complex",
-                    "[1:a]volume=1.0[voice];[2:a]volume=" + fmt(bgmVolume) + "[bgm];"
-                            + "[voice][bgm]amix=inputs=2:duration=first[aout]",
-                    "-vf", "fps=" + fps + ",format=yuv420p",
-                    "-map", "0:v", "-map", "[aout]",
-                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
-                    "-t", fmt(totalDur),
-                    "-movflags", "+faststart",
-                    output.toAbsolutePath().toString()));
-        } else {
-            runFfmpeg(List.of("-y",
-                    "-f", "concat", "-safe", "0", "-i", imageList.toAbsolutePath().toString(),
-                    "-i", combinedAudio.toAbsolutePath().toString(),
-                    "-vf", "fps=" + fps + ",format=yuv420p",
-                    "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k",
-                    "-movflags", "+faststart", "-shortest",
-                    output.toAbsolutePath().toString()));
+        List<String> cmd = new ArrayList<>();
+        cmd.add("ffmpeg");
+        cmd.add("-y");
+        cmd.addAll(imageInputs(slides, durations, t));
+        // Narration is the next input, background music (optional) after it.
+        int voiceIdx = slides.size();
+        cmd.add("-i");
+        cmd.add(combinedAudio.toAbsolutePath().toString());
+        boolean hasBgm = bgmPath != null && Files.isRegularFile(bgmPath);
+        if (hasBgm) {
+            cmd.add("-stream_loop");
+            cmd.add("-1");
+            cmd.add("-i");
+            cmd.add(bgmPath.toAbsolutePath().toString());
         }
+
+        StringBuilder filter = new StringBuilder(videoXfadeFilter(slides.size(), durations, t, totalDur));
+        String audioMap;
+        if (hasBgm) {
+            int bgmIdx = slides.size() + 1;
+            filter.append(";[").append(voiceIdx).append(":a]volume=1.0[voice];")
+                    .append("[").append(bgmIdx).append(":a]volume=").append(fmt(bgmVolume)).append("[bgm];")
+                    .append("[voice][bgm]amix=inputs=2:duration=first[aout]");
+            audioMap = "[aout]";
+        } else {
+            audioMap = voiceIdx + ":a";
+        }
+
+        cmd.add("-filter_complex");
+        cmd.add(filter.toString());
+        cmd.add("-map");
+        cmd.add("[vout]");
+        cmd.add("-map");
+        cmd.add(audioMap);
+        cmd.add("-c:v");
+        cmd.add("libx264");
+        cmd.add("-pix_fmt");
+        cmd.add("yuv420p");
+        cmd.add("-c:a");
+        cmd.add("aac");
+        cmd.add("-b:a");
+        cmd.add("128k");
+        cmd.add("-t");
+        cmd.add(fmt(totalDur));
+        cmd.add("-movflags");
+        cmd.add("+faststart");
+        cmd.add(output.toAbsolutePath().toString());
+
+        runFfmpeg(cmd);
 
         deleteQuietly(tmpDir);
         return output;
+    }
+
+    /** {@code -loop 1 -t (d_i + transition) -framerate fps -i slide_i} for every slide. */
+    private List<String> imageInputs(List<Path> slides, List<Double> durations, double t) {
+        List<String> args = new ArrayList<>();
+        for (int i = 0; i < slides.size(); i++) {
+            args.add("-loop");
+            args.add("1");
+            args.add("-framerate");
+            args.add(Integer.toString(fps));
+            args.add("-t");
+            args.add(fmt(durations.get(i) + t));
+            args.add("-i");
+            args.add(slides.get(i).toAbsolutePath().toString());
+        }
+        return args;
+    }
+
+    /**
+     * Build the {@code filter_complex} fragment that crossfades the slide inputs into a single
+     * {@code [vout]} stream, with a fade from/to black at the very start/end. Each slide is padded
+     * by {@code t}; the crossfade eats that padding so slide i's steady time equals its narration
+     * duration and transitions land in the silent gaps between spoken lines.
+     */
+    private String videoXfadeFilter(int n, List<Double> durations, double t, double total) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            sb.append("[").append(i).append(":v]fps=").append(fps)
+                    .append(",format=yuv420p,setsar=1[v").append(i).append("];");
+        }
+        String last;
+        if (n == 1) {
+            last = "v0";
+        } else {
+            double offset = 0.0;
+            String prev = "v0";
+            for (int j = 1; j < n; j++) {
+                offset += durations.get(j - 1);
+                String out = "x" + j;
+                sb.append("[").append(prev).append("][v").append(j).append("]")
+                        .append("xfade=transition=fade:duration=").append(fmt(t))
+                        .append(":offset=").append(fmt(offset)).append("[").append(out).append("];");
+                prev = out;
+            }
+            last = prev;
+        }
+        double fadeOutStart = Math.max(0.0, total - 0.6);
+        sb.append("[").append(last).append("]format=yuv420p,")
+                .append("fade=t=in:st=0:d=0.5,")
+                .append("fade=t=out:st=").append(fmt(fadeOutStart)).append(":d=0.6[vout]");
+        return sb.toString();
+    }
+
+    /** Keep the crossfade shorter than the shortest slide so offsets stay valid. */
+    private static double transitionFor(List<Double> durations) {
+        double min = durations.stream().mapToDouble(Double::doubleValue).min().orElse(TRANSITION);
+        return Math.max(0.15, Math.min(TRANSITION, min / 2.0 - 0.05));
     }
 
     private static String fmt(double seconds) {
@@ -225,23 +294,19 @@ public class VideoBuilder {
         }
     }
 
-    private static void runFfmpeg(List<String> args) throws IOException, InterruptedException {
+    private static List<String> ff(String... args) {
         List<String> cmd = new ArrayList<>();
         cmd.add("ffmpeg");
-        cmd.addAll(args);
-        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        String log = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (p.waitFor() != 0) {
-            throw new IOException("ffmpeg failed:\n" + log);
+        for (String a : args) {
+            cmd.add(a);
         }
+        return cmd;
     }
 
-    private static void runFfmpeg2(List<String> fullCmd, Path cleanup)
-            throws IOException, InterruptedException {
+    private static void runFfmpeg(List<String> fullCmd) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(fullCmd).redirectErrorStream(true).start();
         String log = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         int exit = p.waitFor();
-        if (cleanup != null) Files.deleteIfExists(cleanup);
         if (exit != 0) {
             throw new IOException("ffmpeg failed (exit " + exit + "):\n" + log);
         }
@@ -256,17 +321,18 @@ public class VideoBuilder {
         List<String> cmd = new ArrayList<>();
         cmd.add("ffmpeg");
         cmd.addAll(List.of("-y", "-f", "lavfi", "-i",
-                "sine=frequency=220:duration=10,volume=0.3"
+                "sine=frequency=220:duration=12,volume=0.3"
                         + ",aecho=0.8:0.88:60:0.4"
                         + ",lowpass=f=800"
                         + ",highpass=f=100",
                 "-f", "lavfi", "-i",
-                "sine=frequency=330:duration=10,volume=0.15"
+                "sine=frequency=330:duration=12,volume=0.15"
                         + ",aecho=0.8:0.9:80:0.3"
                         + ",lowpass=f=1000",
-                "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=longest[out]",
+                "-filter_complex",
+                "[0:a][1:a]amix=inputs=2:duration=longest,afade=t=in:st=0:d=2[out]",
                 "-map", "[out]",
-                "-t", "10",
+                "-t", "12",
                 "-c:a", "libmp3lame", "-b:a", "128k",
                 bgm.toAbsolutePath().toString()));
         Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
@@ -289,6 +355,13 @@ public class VideoBuilder {
                     });
         } catch (IOException ignore) {
             // best effort
+        }
+    }
+
+    private static void requireFfmpeg() {
+        if (!isFfmpegAvailable()) {
+            throw new IllegalStateException(
+                    "ffmpeg was not found on PATH. Install ffmpeg to generate the video.");
         }
     }
 

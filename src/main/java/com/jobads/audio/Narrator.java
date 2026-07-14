@@ -66,6 +66,12 @@ public class Narrator {
                 + (count == 1 ? "opening" : "openings") + " for you. Let's begin.";
     }
 
+    /** Build the spoken line for the closing subscribe card. */
+    public String outroText(String brand) {
+        return "That's all for today. Subscribe to " + sanitize(brand)
+                + " and turn on the bell for daily job updates. Thank you for watching.";
+    }
+
     /**
      * Build the spoken line for a single job. Qualification and contact are shown on the slide to
      * read but omitted from speech (emails/phones read character-by-character are painful to hear).

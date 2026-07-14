@@ -28,6 +28,7 @@ UPLOAD_LATEST="${UPLOAD_LATEST:-true}"
 
 WORK_DIR="$(mktemp -d)"
 OUT_VIDEO="${WORK_DIR}/jobs.mp4"
+OUT_THUMB="${WORK_DIR}/jobs.thumb.png"
 EVIDENCE_DIR="${WORK_DIR}/evidence"
 STAMP="$(date -u +%Y-%m-%d_%H%M%S)"
 DEST_BASE="s3://${OUTPUT_S3_BUCKET}/${OUTPUT_S3_PREFIX}"
@@ -57,6 +58,16 @@ echo "[deploy] uploading video -> ${DEST_BASE}/videos/jobs-${STAMP}.mp4"
 aws s3 cp "${OUT_VIDEO}" "${DEST_BASE}/videos/jobs-${STAMP}.mp4"
 if [[ "${UPLOAD_LATEST}" == "true" ]]; then
   aws s3 cp "${OUT_VIDEO}" "${DEST_BASE}/videos/latest.mp4"
+fi
+
+# YouTube thumbnail (generated next to the video). Uploaded alongside so a
+# publishing step can attach it; missing thumbnail is non-fatal.
+if [[ -f "${OUT_THUMB}" ]]; then
+  echo "[deploy] uploading thumbnail -> ${DEST_BASE}/videos/jobs-${STAMP}.thumb.png"
+  aws s3 cp "${OUT_THUMB}" "${DEST_BASE}/videos/jobs-${STAMP}.thumb.png"
+  if [[ "${UPLOAD_LATEST}" == "true" ]]; then
+    aws s3 cp "${OUT_THUMB}" "${DEST_BASE}/videos/latest.thumb.png"
+  fi
 fi
 
 if [[ "${UPLOAD_EVIDENCE}" == "true" && -d "${EVIDENCE_DIR}" ]]; then
