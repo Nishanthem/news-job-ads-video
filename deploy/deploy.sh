@@ -14,6 +14,7 @@
 #   STACK_NAME (news-job-ads-video)  AWS_REGION (from your CLI config)
 #   MODE (scrape)  BRAND ("RightRoads Job News")  ASSIGN_PUBLIC_IP (ENABLED)
 #   SCHEDULE (cron(0 6 * * ? *))  TIMEZONE (Asia/Kolkata)
+#   JOB_LIMIT (25)  max jobs per video; set to "" for no cap
 #
 # Usage:
 #   VPC_ID=vpc-xxx SUBNET_IDS=subnet-a,subnet-b ./deploy/deploy.sh
@@ -27,6 +28,7 @@ BRAND="${BRAND:-RightRoads Job News}"
 ASSIGN_PUBLIC_IP="${ASSIGN_PUBLIC_IP:-ENABLED}"
 SCHEDULE="${SCHEDULE:-cron(0 6 * * ? *)}"
 TIMEZONE="${TIMEZONE:-Asia/Kolkata}"
+JOB_LIMIT="${JOB_LIMIT-25}"
 
 : "${VPC_ID:?VPC_ID must be set}"
 : "${SUBNET_IDS:?SUBNET_IDS must be set (comma-separated subnet ids)}"
@@ -49,7 +51,8 @@ aws cloudformation deploy \
     ScheduleExpression="${SCHEDULE}" \
     ScheduleTimezone="${TIMEZONE}" \
     Mode="${MODE}" \
-    Brand="${BRAND}"
+    Brand="${BRAND}" \
+    JobLimit="${JOB_LIMIT}"
 
 get_output() {
   aws cloudformation describe-stacks --region "${AWS_REGION}" \

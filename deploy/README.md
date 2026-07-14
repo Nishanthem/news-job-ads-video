@@ -61,7 +61,7 @@ Change behaviour via CloudFormation parameters (pass through `deploy.sh` env var
 | `ScheduleEnabled` | `ENABLED` | `DISABLED` to pause automatic runs |
 | `Mode` | `scrape` | `scrape` real sites or `sample` |
 | `Brand` | `RightRoads Job News` | Title on the slides |
-| `JobLimit` | (none) | Cap number of jobs |
+| `JobLimit` | `25` | Max jobs per video (scrape can return 1000+; set to `""` for no cap) |
 | `TaskCpu` / `TaskMemory` | `2048` / `4096` | Fargate size (2 vCPU / 4 GB) |
 | `AssignPublicIp` | `ENABLED` | `DISABLED` for private subnets + NAT |
 

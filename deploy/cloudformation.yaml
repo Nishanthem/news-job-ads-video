@@ -72,8 +72,11 @@ Parameters:
 
   JobLimit:
     Type: String
-    Default: ""
-    Description: Optional cap on number of jobs (empty = no cap).
+    Default: "25"
+    Description: >-
+      Cap on number of jobs rendered into the daily video (empty = no cap).
+      Scrape mode can return 1000+ ads, so a cap keeps the video and task
+      runtime sane; set to "" only if you deliberately want every job.
 
 Conditions:
   HasBrand: !Not [!Equals [!Ref Brand, ""]]
