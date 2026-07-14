@@ -15,6 +15,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,8 +45,9 @@ import java.util.Map;
  *     --no-evidence         skip capturing evidence screenshots
  *     --no-audio            skip spoken narration (otherwise on when a TTS engine is available)
  *     --bgm &lt;file&gt;          path to an MP3/WAV background music file (looped under narration)
- *     --bgm-default         generate a simple ambient BGM automatically (no file needed)
- *     --bgm-volume &lt;0.0-1.0&gt; background music volume relative to narration (default: 0.15)
+ *     --bgm-default         generate a simple ambient BGM automatically (on by default)
+ *     --no-bgm              disable background music entirely
+ *     --bgm-volume &lt;0.0-1.0&gt; background music volume relative to narration (default: 0.12)
  *     --disclaimer &lt;text&gt;   custom disclaimer shown/narrated after the intro (has a default)
  *     --no-disclaimer       omit the disclaimer card
  * </pre>
@@ -113,6 +117,9 @@ public class App {
         Path workDir = Files.createTempDirectory("job-slides-");
         System.out.println("[app] rendering " + jobs.size() + " slide(s) to " + workDir);
         SlideGenerator slideGenerator = new SlideGenerator(brand);
+        String dateText = LocalDate.now(ZoneId.of("Asia/Kolkata"))
+                .format(DateTimeFormatter.ofPattern("d MMMM yyyy"));
+        slideGenerator.setDateText(dateText);
         Narrator narrator = new Narrator();
 
         // Build slides and their matching narration lines in lock-step so the audio always lines up.
@@ -136,17 +143,34 @@ public class App {
             narrations.add(narrator.jobText(jobs.get(i), i + 1, jobs.size()));
         }
 
+        // Closing subscribe call-to-action.
+        slides.add(slideGenerator.renderOutro(workDir, String.format("slide-%03d.png", slideNo++)));
+        narrations.add(narrator.outroText(brand));
+
+        // A YouTube thumbnail written next to the output video.
+        try {
+            Path thumb = thumbnailPath(output);
+            slideGenerator.renderThumbnail(jobs.size(), thumb.getParent(),
+                    thumb.getFileName().toString());
+            System.out.println("[app] thumbnail written to: " + thumb.toAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("[app] thumbnail generation failed (continuing): " + e.getMessage());
+        }
+
         VideoBuilder videoBuilder = new VideoBuilder(seconds, fps);
         boolean wantAudio = !opts.containsKey("no-audio");
 
         Path bgmPath = null;
-        if (opts.containsKey("bgm")) {
+        if (opts.containsKey("no-bgm")) {
+            System.out.println("[app] background music disabled (--no-bgm).");
+        } else if (opts.containsKey("bgm")) {
             bgmPath = Paths.get(opts.get("bgm"));
             if (!Files.isRegularFile(bgmPath)) {
                 System.err.println("[app] WARNING: --bgm file not found: " + bgmPath + "; skipping BGM.");
                 bgmPath = null;
             }
-        } else if (opts.containsKey("bgm-default")) {
+        } else {
+            // On by default: a gentle generated bed under the narration.
             try {
                 System.out.println("[app] generating default background music...");
                 bgmPath = VideoBuilder.generateDefaultBgm(workDir);
@@ -156,7 +180,7 @@ public class App {
             }
         }
         if (bgmPath != null) {
-            double bgmVol = Double.parseDouble(opts.getOrDefault("bgm-volume", "0.15"));
+            double bgmVol = Double.parseDouble(opts.getOrDefault("bgm-volume", "0.12"));
             videoBuilder.setBgm(bgmPath, bgmVol);
             System.out.println("[app] background music enabled (volume: " + bgmVol + ")");
         }
@@ -181,6 +205,17 @@ public class App {
         }
 
         System.out.println("[app] DONE. Video written to: " + output.toAbsolutePath());
+    }
+
+    /** Thumbnail path derived from the output video path (e.g. jobs.mp4 -> jobs.thumb.png). */
+    private static Path thumbnailPath(Path output) {
+        Path abs = output.toAbsolutePath();
+        Path parent = abs.getParent();
+        String name = abs.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String thumbName = base + ".thumb.png";
+        return parent == null ? Paths.get(thumbName) : parent.resolve(thumbName);
     }
 
     private static String defaultEvidenceDir(Path output) {

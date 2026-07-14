@@ -152,13 +152,21 @@ Always check a website's **Terms of Service** and `robots.txt` before scraping i
 sources that offer an RSS feed or official API. This tool intentionally re-renders the job details
 into original slides rather than copying the newspaper's own ad images.
 
-## Deploying on AWS (optional)
+## Deploying on AWS (serverless, scheduled)
 
-Because the job is a periodic batch (e.g. produce one video per day), the simplest deployment is:
+Because the job is a periodic batch (produce one video per day), it should **not** run on an
+always-on EC2 instance — that bills 24/7 while the pipeline is idle almost all the time. Instead
+this repo ships a **daily scheduled ECS Fargate task** that starts, produces the video, uploads it
+to S3, and shuts down, so you pay only for the few minutes it runs.
 
-- **AWS Lambda + EventBridge schedule** to run the jar on a cron, writing the video to **S3**; or
-- **ECS Fargate scheduled task** running the Docker image; or
-- **Elastic Beanstalk** if you later wrap it in a web service.
+```bash
+export AWS_REGION=us-east-1
+export VPC_ID=vpc-xxxxxxxx
+export SUBNET_IDS=subnet-aaaa,subnet-bbbb   # public subnets
+./deploy/deploy.sh
+```
 
-`ffmpeg` (and Chrome/Chromium, if you want evidence capture) must be available in the runtime — e.g.
-as Lambda layers or baked into the container image.
+This builds the container image (`Dockerfile` — bundles `ffmpeg`, Chromium, and the piper/espeak
+TTS engines) and deploys the infrastructure via CloudFormation (ECR, S3, ECS, an EventBridge
+Scheduler cron, and least-privilege IAM). See **[`deploy/README.md`](deploy/README.md)** for the
+full walkthrough, configuration options, cost notes, and required deployer permissions.
